@@ -9,14 +9,14 @@ const app = express();
 
 // CORS 설정: Cloudflare로 배포된 실제 게임 주소를 허용해야 합니다.
 app.use(cors({
-  origin: "https://mirotest.pages.dev"
+  origin: "https://miromulti.pages.dev/"
 }));
 
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "https://mirotest.pages.dev", // 클라이언트(게임) 주소
+    origin: "https://miromulti.pages.dev/", // 클라이언트(게임) 주소
     methods: ["GET", "POST"]
   }
 });
