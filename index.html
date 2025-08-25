@@ -76,7 +76,16 @@
                     <span class="text-sm text-gray-600">방 ID: <strong id="roomIdDisplay" class="text-lg"></strong></span>
                     <button id="copyRoomIdBtn" class="action-button" style="font-size: 0.8rem; padding: 4px 8px;">복사</button>
                 </div>
-                <label for="mazeWidthSelectLobby">로비 (가로 x 세로):</label>
+                
+                <div class="maze-size-input-group">
+                    <label>조작 방식 선택:</label>
+                    <div id="controlModeContainerLobby" class="flex gap-2 justify-center">
+                        <button class="action-button control-mode-button" data-mode="keyboard">키보드 방식</button>
+                        <button class="action-button control-mode-button" data-mode="joystick">조이스틱 방식</button>
+                    </div>
+                </div>
+
+                <label for="mazeWidthSelectLobby">미로 크기 (가로 x 세로):</label>
                 <div class="maze-size-input">
                     <select id="mazeWidthSelectLobby"></select>
                     <span>x</span>
@@ -125,72 +134,46 @@
                 <div class="keyboard-controls">
                     <div class="main-controls-row">
                         <div class="left-control-stack">
-                            <div class="rollback-group" role="group" aria-label="위치 저장/이동 그룹">
-                                <button id="rollback1_left" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
-                                    <span class="rollback-num">1</span>
-                                    <span class="rollback-desc">위치저장</span>
-                                </button>
-                                <button id="rollback2_left" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
-                                    <span class="rollback-num">2</span>
-                                    <span class="rollback-desc">위치저장</span>
-                                </button>
+                            <div class="rollback-group" role="group">
+                                <button id="rollback1_left" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
+                                <button id="rollback2_left" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
                             </div>
                             <div class="text-actions-row">
-                                <button id="qButton" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
-                                    <span class="key-char">Q</span>
-                                    <span class="key-desc">시작위치</span>
-                                </button>
-                                <button id="wButton" class="multi-line-action-button" aria-label="지나온 동선 표시">
-                                    <span class="key-char">W</span>
-                                    <span class="key-desc">동선</span>
-                                </button>
+                                <button id="qButton" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
+                                <button id="wButton" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
                             </div>
                         </div>
-                        <div class="directional-controls" role="group" aria-label="방향키">
+                        <div class="directional-controls" role="group">
                             <div class="directional-row top-row">
                                 <div class="placeholder-button"></div>
-                                <button id="up" class="game-button-base arrow-button" aria-label="위로 이동">⬆️</button>
+                                <button id="up" class="game-button-base arrow-button">⬆️</button>
                                 <div class="placeholder-button"></div>
                             </div>
                             <div class="directional-row middle-row">
-                                <button id="left" class="game-button-base arrow-button" aria-label="왼쪽으로 이동">⬅️</button>
-                                <button id="down" class="game-button-base arrow-button" aria-label="아래로 이동">⬇️</button>
-                                <button id="right" class="game-button-base arrow-button" aria-label="오른쪽으로 이동">➡️</button>
+                                <button id="left" class="game-button-base arrow-button">⬅️</button>
+                                <button id="down" class="game-button-base arrow-button">⬇️</button>
+                                <button id="right" class="game-button-base arrow-button">➡️</button>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <!-- Joystick Controls UI -->
                 <div class="joystick-controls">
                     <div class="left-control-stack">
-                        <div class="rollback-group" role="group" aria-label="조이스틱 위치 저장/이동 그룹">
-                            <button id="rollback1_joystick" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
-                                <span class="rollback-num">1</span>
-                                <span class="rollback-desc">위치저장</span>
-                            </button>
-                            <button id="rollback2_joystick" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
-                                <span class="rollback-num">2</span>
-                                <span class="rollback-desc">위치저장</span>
-                            </button>
+                        <div class="rollback-group" role="group">
+                            <button id="rollback1_joystick" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
+                            <button id="rollback2_joystick" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
                         </div>
                         <div class="text-actions-row">
-                            <button id="qButton_joystick" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
-                                <span class="key-char">Q</span>
-                                <span class="key-desc">시작위치</span>
-                            </button>
-                            <button id="wButton_joystick" class="multi-line-action-button" aria-label="지나온 동선 표시">
-                                <span class="key-char">W</span>
-                                <span class="key-desc">동선</span>
-                            </button>
+                            <button id="qButton_joystick" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
+                            <button id="wButton_joystick" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
                         </div>
                     </div>
-                    <div id="joystickBase" class="joystick-base" role="button" aria-label="조이스틱 컨트롤러">
+                    <div id="joystickBase" class="joystick-base" role="button">
                         <div id="joystickKnob" class="joystick-knob"></div>
                     </div>
                 </div>
             </div>
-
             <!-- 개별 클리어 시 나타나는 오버레이 -->
             <div id="finishOverlay" class="absolute inset-0 bg-white bg-opacity-30 backdrop-blur-sm flex items-center justify-center hidden">
                 <p id="finishRankText" class="text-5xl font-bold text-gray-800" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"></p>
@@ -206,9 +189,7 @@
 
     <!-- Modals -->
     <div id="winModal" class="win-modal">
-        <div id="winModalContent" class="win-modal-content">
-            <!-- 내용이 동적으로 채워집니다 -->
-        </div>
+        <div id="winModalContent" class="win-modal-content"></div>
     </div>
     <div id="helpModal" class="help-modal">
         <div class="help-modal-content">

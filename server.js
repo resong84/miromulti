@@ -35,7 +35,7 @@ const updateLobbyState = (roomId) => {
 
 const broadcastRoomList = () => {
     const roomList = Object.values(rooms)
-        .filter(room => !room.gameStarted) // 게임이 시작되지 않은 방만 목록에 포함
+        .filter(room => !room.gameStarted)
         .map(room => ({
             id: room.id,
             playerCount: Object.keys(room.players).length
@@ -98,7 +98,7 @@ io.on('connection', (socket) => {
 
   socket.on('playerReady', ({ isReady }) => {
     const roomId = playerRooms[socket.id];
-    if (rooms[roomId] && rooms[roomId].players[socket.id]) {
+    if (rooms[roomId]?.players[socket.id]) {
         rooms[roomId].players[socket.id].isReady = isReady;
         updateLobbyState(roomId);
     }
@@ -121,15 +121,25 @@ io.on('connection', (socket) => {
     if (room && room.players[socket.id]?.isMaster) {
         if (Object.values(room.players).every(p => p.isReady)) {
             room.gameStarted = true;
-            broadcastRoomList(); // 게임 시작된 방은 목록에서 제외
+            broadcastRoomList();
             io.to(roomId).emit('gameCountdown');
             
             setTimeout(() => {
                 console.log(`[진단] ${roomId} 방 게임 시작!`);
-                io.to(roomId).emit('gameStarting', room.settings);
+                io.to(roomId).emit('gameStartingWithData', room.mazeData);
             }, 5000);
         }
     }
+  });
+
+  // Master가 생성한 미로 데이터를 받아 저장하고 게임 시작을 알림
+  socket.on('gameDataReady', (data) => {
+      const roomId = playerRooms[socket.id];
+      const room = rooms[roomId];
+      if (room && room.players[socket.id]?.isMaster) {
+          room.mazeData = data; // 미로 데이터 저장
+          socket.emit('startGame'); // Master 본인에게도 시작 신호 전송
+      }
   });
 
   socket.on('playerFinished', () => {
@@ -139,13 +149,11 @@ io.on('connection', (socket) => {
         const rank = room.finishers.length + 1;
         room.finishers.push({ id: socket.id, rank });
         
-        // 본인에게 순위 전송
         socket.emit('youFinished', { rank });
 
-        // 모든 플레이어가 클리어했는지 확인
         if (room.finishers.length === room.playerCount) {
             io.to(roomId).emit('gameOver', { rankings: room.finishers });
-            delete rooms[roomId]; // 게임 끝난 방 삭제
+            delete rooms[roomId];
         }
     }
   });
@@ -153,7 +161,7 @@ io.on('connection', (socket) => {
   socket.on('playerMovement', (movementData) => {
     const roomId = playerRooms[socket.id];
     if (roomId) {
-        socket.to(roomId).broadcast.emit('playerMoved', { id: socket.id, ...movementData });
+        socket.to(roomId).emit('playerMoved', { id: socket.id, ...movementData });
     }
   });
 

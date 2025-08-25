@@ -50,6 +50,7 @@ const joystickKnob = document.getElementById('joystickKnob');
 // Start Screen
 const startScreenModal = document.getElementById('startScreenModal');
 const controlModeContainer = document.getElementById('controlModeContainer');
+const controlModeContainerLobby = document.getElementById('controlModeContainerLobby');
 const ageButtonsContainer = document.getElementById('ageButtonsContainer');
 const customSizeBtn = document.getElementById('customSizeBtn');
 const customSizeContainer = document.getElementById('customSizeContainer');
@@ -84,10 +85,6 @@ const closeRoomListModalButton = document.getElementById('closeRoomListModalButt
 // Modals
 const winModal = document.getElementById('winModal');
 const winModalContent = document.getElementById('winModalContent');
-const winTimeMessage = document.getElementById('winTimeMessage');
-const winMazeSizeMessage = document.getElementById('winMazeSizeMessage');
-const winRestartButton = document.getElementById('winRestartButton');
-const winHomeButton = document.getElementById('winHomeButton');
 const helpModal = document.getElementById('helpModal');
 const closeHelpModalButton = document.getElementById('closeHelpModalButton');
 const screenshotModal = document.getElementById('screenshotModal');
@@ -111,7 +108,7 @@ let startPos = { x: 0, y: 0 };
 let endPos = { x: 0, y: 0 };
 let startTime;
 let timerInterval;
-let gameWon = false; // 플레이어 개인이 클리어했는지 여부
+let gameWon = false;
 let wButtonUsed = false;
 let qButtonUsed = false;
 let playerPath = [];
@@ -249,7 +246,6 @@ function drawMaze(flagYOffset = 0) {
 }
 
 function animate() {
-    // 애니메이션은 게임이 끝나도 다른 플레이어를 보기 위해 계속 실행
     flagAnimationTime += 0.05;
     const flagYOffset = Math.sin(flagAnimationTime) * (TILE_SIZE * 0.4);
     
@@ -538,13 +534,16 @@ function findShortestPath() {
 }
 
 function checkWin() {
-    if (gameWon) return; // 이미 클리어했다면 중복 실행 방지
+    if (gameWon) return;
 
     if (player.x === endPos.x && player.y === endPos.y) {
-        socket.emit('playerFinished');
-        gameWon = true; // 개인의 클리어 상태를 true로 설정
+        if (socket) {
+            socket.emit('playerFinished');
+        } else { // 싱글 플레이어 모드
+            showWinScreen([{ id: 'player1', rank: 1 }]);
+        }
+        gameWon = true;
         
-        // 사운드 중지
         clearTimeout(moveSoundTimeout);
         if (gallopingSound) gallopingSound.pause();
         if (isSoundOn && clearSound) {
@@ -567,7 +566,7 @@ function playSound(soundElement) {
 }
 
 function movePlayer(dx, dy) {
-    if (gameWon) return; // 클리어한 플레이어는 움직일 수 없음
+    if (gameWon) return;
     
     const wallCheckX = player.x + dx * CENTER_OFFSET;
     const wallCheckY = player.y + dy * CENTER_OFFSET;
@@ -783,6 +782,8 @@ function setupSocketListeners() {
             count--;
             if (count > 0) {
                 countdownText.textContent = count;
+            } else if (count === 0) {
+                countdownText.textContent = "START!";
             } else {
                 clearInterval(interval);
                 countdownOverlay.classList.add('hidden');
@@ -790,10 +791,11 @@ function setupSocketListeners() {
         }, 1000);
     });
 
-    socket.on('gameStarting', (settings) => {
-        MAZE_WIDTH = settings.width;
-        MAZE_HEIGHT = settings.height;
-        initGame();
+    socket.on('gameStartingWithData', (data) => {
+        maze = data.maze;
+        startPos = data.startPos;
+        endPos = data.endPos;
+        startGameplay();
     });
 
     socket.on('youFinished', ({ rank }) => {
@@ -823,33 +825,25 @@ function setupSocketListeners() {
 function showWinScreen(rankings) {
     let rankingHTML = '<h2 class="help-message-title">게임 종료!</h2><div class="w-full mt-4">';
     rankings.forEach(player => {
-        const isMe = player.id === socket.id;
-        rankingHTML += `<p class="text-lg ${isMe ? 'font-bold text-blue-600' : ''}">${player.rank}위: ${isMe ? '나' : '상대방'}</p>`;
+        const isMe = player.id === (socket ? socket.id : 'player1');
+        rankingHTML += `<p class="text-lg ${isMe ? 'font-bold text-blue-600' : ''}">${player.rank}위: ${isMe ? '나' : `Player ${player.id.substring(0, 4)}`}</p>`;
     });
     rankingHTML += '</div>';
     
     rankingHTML += `
         <div class="win-modal-buttons mt-4">
             <button id="winHomeButtonNew" class="action-button">처음으로</button>
-            <button id="winRestartButtonNew" class="action-button">다시 시작</button>
         </div>
     `;
     
     winModalContent.innerHTML = rankingHTML;
     
-    // 새 버튼에 이벤트 리스너 추가
     document.getElementById('winHomeButtonNew').addEventListener('click', showStartScreen);
-    document.getElementById('winRestartButtonNew').addEventListener('click', () => {
-        winModal.style.display = 'none';
-        // 멀티플레이 재시작은 로비로 돌아가는 것이 자연스러움
-        showStartScreen(); 
-    });
 
     winModal.style.display = 'flex';
 }
 
-
-function initGame() {
+function startGameplay() {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     
     clearTimeout(moveSoundTimeout);
@@ -869,19 +863,10 @@ function initGame() {
     clearInterval(timerInterval);
     timerDisplay.textContent = '00분00초00';
     
-    initializeCanvasSize();
+    player = { ...startPos };
+    playerPath = [{ ...player }];
 
-    let attempts = 0;
-    const maxAttempts = 50;
-    do {
-        generateMaze();
-        placeStartEnd();
-        attempts++;
-        if (attempts > maxAttempts) {
-            console.error("Failed to generate a solvable maze.");
-            break;
-        }
-    } while (findShortestPath() === -1); 
+    initializeCanvasSize();
 
     if (socket) {
         socket.emit('playerMovement', { x: player.x, y: player.y });
@@ -893,8 +878,63 @@ function initGame() {
     timerInterval = setInterval(updateTimerDisplay, 10);
 }
 
+function initGame() { // 싱글 플레이어용
+    generateMaze();
+    placeStartEnd();
+    startGameplay();
+}
+
 function setupEventListeners() {
-    // --- Start Screen ---
+    // --- 조작 방식 선택 버튼 통합 관리 ---
+    [controlModeContainer, controlModeContainerLobby].forEach(container => {
+        container.addEventListener('click', (e) => {
+            if (e.target.classList.contains('control-mode-button')) {
+                controlMode = e.target.dataset.mode;
+                // 두 컨테이너의 모든 버튼 스타일 초기화
+                document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
+                // 선택된 모드와 일치하는 모든 버튼에 스타일 적용
+                document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.style.backgroundColor = '#4F46E5');
+            }
+        });
+    });
+
+    // --- '혼자 하기' 화면 버튼 ---
+    ageButtonsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('age-button')) {
+            const size = parseInt(e.target.dataset.size);
+            MAZE_WIDTH = size; MAZE_HEIGHT = size;
+            mainLayout.className = `main-layout mode-${controlMode}`;
+            startScreenModal.style.display = 'none';
+            mainLayout.style.display = 'flex';
+            initGame();
+        }
+    });
+    customSizeBtn.addEventListener('click', () => {
+        ageButtonsContainer.parentElement.classList.add('hidden');
+        customSizeContainer.classList.remove('hidden');
+    });
+    startButton.addEventListener('click', () => {
+        MAZE_WIDTH = parseInt(mazeWidthSelect.value);
+        MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
+        initGame();
+    });
+    backToPresetButton.addEventListener('click', () => {
+        customSizeContainer.classList.add('hidden');
+        ageButtonsContainer.parentElement.classList.remove('hidden');
+    });
+    autoFitButton.addEventListener('click', () => {
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        MAZE_WIDTH = maxWidth; MAZE_HEIGHT = maxHeight;
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
+        initGame();
+    });
+
+    // --- 멀티플레이 UI 이벤트 리스너 ---
     singlePlayerBtn.addEventListener('click', () => {
         gameModeContainer.classList.add('hidden');
         singlePlayerContainer.classList.remove('hidden');
@@ -943,7 +983,7 @@ function setupEventListeners() {
     backToMultiplayerChoiceButton.addEventListener('click', () => {
         lobbyContainer.classList.add('hidden');
         multiplayerChoiceContainer.classList.remove('hidden');
-        // To-Do: 방에서 나가는 로직
+        socket.emit('leaveRoom');
     });
 
     autoFitButtonLobby.addEventListener('click', () => {
@@ -984,12 +1024,10 @@ function setupEventListeners() {
         if (startScreenModal.style.display !== 'none') return;
         const key = e.key.toLowerCase();
 
-        // 기능 키 처리 (return을 추가하여 중복 실행 방지)
         if (['1', '2'].includes(key)) { saveOrLoadPosition(key); return; }
         if (key === 'q') { handleQButton(); return; }
         if (key === 'w') { handleWButton(); return; }
 
-        // 방향키 처리
         switch (e.key) {
             case 'ArrowUp': movePlayer(0, -1); break;
             case 'ArrowDown': movePlayer(0, 1); break;
@@ -998,7 +1036,55 @@ function setupEventListeners() {
         }
     });
 
-    // ... (나머지 이벤트 리스너는 이전과 거의 동일)
+    ['up', 'down', 'left', 'right'].forEach(dir => {
+        const btn = document.getElementById(dir);
+        btn.addEventListener('mousedown', (e) => { e.preventDefault(); startContinuousMove(dir); });
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); startContinuousMove(dir); });
+        btn.addEventListener('mouseleave', () => stopContinuousMove(dir));
+        btn.addEventListener('touchend', () => stopContinuousMove(dir));
+    });
+    document.addEventListener('mouseup', stopAllContinuousMoves);
+
+    joystickBase.addEventListener('mousedown', startJoystick);
+    joystickBase.addEventListener('touchstart', startJoystick, { passive: false });
+    document.addEventListener('mousemove', handleJoystickMove);
+    document.addEventListener('touchmove', handleJoystickMove, { passive: false });
+    document.addEventListener('mouseup', stopJoystick);
+    document.addEventListener('touchend', stopJoystick);
+
+    [qButton, qButton_joystick].forEach(btn => btn.addEventListener('click', handleQButton));
+    [wButton, wButton_joystick].forEach(btn => btn.addEventListener('click', handleWButton));
+    for (const key in rollbackButtons) {
+        rollbackButtons[key].forEach(btn => {
+            if (btn) btn.addEventListener('click', () => saveOrLoadPosition(key));
+        });
+    }
+    
+    restartButton.addEventListener('click', initGame);
+    resetSizeButton.addEventListener('click', showStartScreen);
+    helpButton.addEventListener('click', () => { helpModal.style.display = 'flex'; });
+    closeHelpModalButton.addEventListener('click', () => { helpModal.style.display = 'none'; });
+    shareButton.addEventListener('click', takeScreenshot);
+    closeScreenshotModalButton.addEventListener('click', () => { screenshotModal.style.display = 'none'; });
+    
+    soundToggleButton.addEventListener('click', () => {
+        isSoundOn = !isSoundOn;
+        soundToggleButton.textContent = isSoundOn ? '🔊' : '🔇';
+        const allHtmlAudio = [gallopingSound, spotSaveSound, spotLoadSound, pastStepSound, clearSound];
+        allHtmlAudio.forEach(audio => audio.muted = !isSoundOn);
+        if(audioContextResumed) Tone.Destination.mute = !isSoundOn;
+        if (!isSoundOn && gallopingSound && !gallopingSound.paused) {
+            gallopingSound.pause();
+        }
+    });
+
+    window.addEventListener('resize', () => { 
+        if (mainLayout.style.display === 'flex') { 
+            initializeCanvasSize(); 
+        } else if (startScreenModal.style.display === 'flex') {
+            calculateAndDisplayMaxMazeSize();
+        }
+    });
 }
 
 function populateSizeDropdowns() {
