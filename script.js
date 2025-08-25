@@ -743,6 +743,10 @@ function initGame() {
         }
     } while (findShortestPath() === -1); 
 
+    if (socket) {
+        socket.emit('playerMovement', { x: player.x, y: player.y });
+    }
+
     playImpactSound();
     animate();
     startTime = Date.now();
