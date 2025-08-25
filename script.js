@@ -910,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 서버에 접속하는 로직 추가
     // "YOUR_SERVER_URL"은 Render 등에서 제공하는 실제 서버 주소로 변경해야 합니다.
     try {
-        socket = io("YOUR_SERVER_URL"); 
+        socket = io("https://miromulti.onrender.com"); 
         setupSocketListeners(); // 소켓 이벤트 리스너 설정 함수 호출
     } catch (e) {
         console.error("서버에 연결할 수 없습니다.", e);

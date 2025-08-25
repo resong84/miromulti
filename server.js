@@ -6,15 +6,20 @@ const { Server } = require("socket.io");
 const cors = require('cors'); // CORS 미들웨어 추가
 
 const app = express();
+
 // CORS 설정: Cloudflare로 배포된 실제 게임 주소를 허용해야 합니다.
+// "https://mirotest.pages.dev" 에서 오는 요청을 허락합니다.
 app.use(cors({
-  origin: "https://mirotest.pages.dev/" // 예: "https://maze-game.pages.dev"
+  origin: "https://mirotest.pages.dev"
 }));
 
 const server = http.createServer(app);
+
+// Socket.IO의 CORS 설정:
+// 마찬가지로 "https://mirotest.pages.dev" 에서 오는 접속을 허락합니다.
 const io = new Server(server, {
   cors: {
-    origin: "YOUR_GAME_URL_ON_CLOUDFLARE", // 클라이언트 주소
+    origin: "https://mirotest.pages.dev", // 클라이언트(게임) 주소
     methods: ["GET", "POST"]
   }
 });
