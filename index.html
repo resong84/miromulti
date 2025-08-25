@@ -77,12 +77,17 @@
 
             <!-- 3. 로비 (새로운 게임 만들기) -->
             <div id="lobbyContainer" class="maze-size-input-group hidden">
+                <!-- 방 ID 표시 및 복사 -->
+                <div id="roomInfoContainer" class="hidden mt-2 text-center" style="margin-bottom: 10px;">
+                    <p class="text-sm text-gray-600">방 ID: <strong id="roomIdDisplay"></strong></p>
+                    <button id="copyRoomIdBtn" class="action-button" style="font-size: 0.8rem; padding: 4px 8px; margin-top: 4px;">ID 복사</button>
+                </div>
+
                 <label for="mazeWidthSelectLobby">로비 (가로 x 세로):</label>
                 <div class="maze-size-input">
                     <select id="mazeWidthSelectLobby" aria-label="미로 가로 크기 선택"></select>
                     <span>x</span>
                     <select id="mazeHeightSelectLobby" aria-label="미로 세로 크기 선택"></select>
-                    <!-- 4. 최대 크기 버튼 -->
                     <button id="autoFitButtonLobby" class="action-button" style="background-color: #A7C7E7; margin-left: 5px; padding: 8px 12px; font-size: 0.9rem;" aria-label="현재 화면에 맞는 최대 크기로 설정">최대</button>
                 </div>
                 <p class="size-limit-text">크기를 선택해주세요.</p>
@@ -90,7 +95,6 @@
                     <button id="backToMultiplayerChoiceButton" class="action-button reset-size-button">돌아가기</button>
                     <div class="relative flex-grow">
                         <button id="startLobbyButton" class="start-button w-full">게임 시작</button>
-                        <!-- 3. 준비 버튼 -->
                         <button id="readyButton" class="start-button absolute top-0 left-0 w-full h-full flex items-center justify-center" style="background-color: var(--color-green-pastel);">준비</button>
                     </div>
                 </div>
@@ -124,7 +128,6 @@
                     <div class="main-controls-row">
                         <div class="left-control-stack">
                             <div class="rollback-group" role="group" aria-label="위치 저장/이동 그룹">
-                                <!-- 롤백 버튼 UI 수정 -->
                                 <button id="rollback1_left" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
                                     <span class="rollback-num">1</span>
                                     <span class="rollback-desc">위치저장</span>
@@ -164,7 +167,6 @@
                 <div class="joystick-controls">
                     <div class="left-control-stack">
                         <div class="rollback-group" role="group" aria-label="조이스틱 위치 저장/이동 그룹">
-                            <!-- 롤백 버튼 UI 수정 -->
                             <button id="rollback1_joystick" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
                                 <span class="rollback-num">1</span>
                                 <span class="rollback-desc">위치저장</span>

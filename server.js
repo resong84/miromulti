@@ -4,11 +4,10 @@ const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
 const cors = require('cors');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
-// CORS 설정: Cloudflare로 배포된 실제 게임 주소를 허용해야 합니다.
-// 중요: 주소 끝에 '/'를 제거했습니다.
 app.use(cors({
   origin: "https://miromulti.pages.dev" 
 }));
@@ -17,53 +16,119 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "https://miromulti.pages.dev", // 클라이언트(게임) 주소 (끝에 '/' 제거)
+    origin: "https://miromulti.pages.dev",
     methods: ["GET", "POST"]
   }
 });
 
 const PORT = process.env.PORT || 3000;
 
-// 모든 플레이어의 정보를 저장할 객체
 let players = {};
+let rooms = {};
+let playerRooms = {};
 
-// 클라이언트가 서버에 접속했을 때 실행될 로직
+const updateLobbyState = (roomId) => {
+    if (rooms[roomId]) {
+        io.to(roomId).emit('lobbyStateUpdate', rooms[roomId]);
+    }
+};
+
 io.on('connection', (socket) => {
-  // 이 메시지가 Render 로그에 보여야 합니다.
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
 
-  // 1. 새로운 플레이어 정보 생성 및 저장
-  players[socket.id] = {
-    id: socket.id,
-    x: 0, // 초기 위치 (게임 로직에 맞게 수정 필요)
-    y: 0,
-  };
-
-  // 2. 현재까지 접속한 모든 플레이어 정보를 새 플레이어에게 전송
-  console.log('[진단] currentPlayers 전송:', players); // [진단 코드]
+  players[socket.id] = { id: socket.id, x: 0, y: 0 };
   socket.emit('currentPlayers', players);
-
-  // 3. 새로운 플레이어의 등장을 다른 모든 플레이어에게 알림
-  console.log('[진단] newPlayer 전송:', players[socket.id]); // [진단 코드]
   socket.broadcast.emit('newPlayer', players[socket.id]);
 
-  // 4. 플레이어가 움직였다는 정보를 받았을 때 처리
+  socket.on('createGame', (settings) => {
+    const roomId = uuidv4().substring(0, 6); // 더 짧은 ID로 변경
+    socket.join(roomId);
+    playerRooms[socket.id] = roomId;
+
+    rooms[roomId] = {
+        id: roomId,
+        players: {
+            [socket.id]: { id: socket.id, isReady: false, isMaster: true }
+        },
+        settings: { width: settings.width, height: settings.height }
+    };
+    console.log(`[진단] 방 생성됨: ${roomId}, Master: ${socket.id}`);
+    socket.emit('roomCreated', { roomId });
+    updateLobbyState(roomId);
+  });
+
+  // 게임 참여 로직 추가
+  socket.on('joinGame', ({ roomId }) => {
+    if (rooms[roomId]) {
+        socket.join(roomId);
+        playerRooms[socket.id] = roomId;
+        rooms[roomId].players[socket.id] = { id: socket.id, isReady: false, isMaster: false };
+        
+        console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
+        socket.emit('joinSuccess');
+        updateLobbyState(roomId); // 새로운 플레이어가 참여했음을 모두에게 알림
+    } else {
+        socket.emit('joinError', { message: '해당 방을 찾을 수 없습니다. ID를 다시 확인해주세요.' });
+    }
+  });
+
+  socket.on('playerReady', ({ isReady }) => {
+    const roomId = playerRooms[socket.id];
+    if (rooms[roomId] && rooms[roomId].players[socket.id]) {
+        rooms[roomId].players[socket.id].isReady = isReady;
+        console.log(`[진단] ${socket.id} 준비 상태 변경: ${isReady}`);
+        updateLobbyState(roomId);
+    }
+  });
+
+  socket.on('settingsChanged', (newSettings) => {
+    const roomId = playerRooms[socket.id];
+    const room = rooms[roomId];
+    if (room && room.players[socket.id] && room.players[socket.id].isMaster) {
+        room.settings = newSettings;
+        Object.values(room.players).forEach(player => {
+            player.isReady = false;
+        });
+        console.log(`[진단] ${roomId} 방 설정 변경됨. 모든 플레이어 준비 취소.`);
+        io.to(roomId).emit('unReadyAllPlayers');
+        updateLobbyState(roomId);
+    }
+  });
+
+  socket.on('startGame', () => {
+    const roomId = playerRooms[socket.id];
+    const room = rooms[roomId];
+    if (room && room.players[socket.id] && room.players[socket.id].isMaster) {
+        const allReady = Object.values(room.players).every(p => p.isReady);
+        if (allReady) {
+            console.log(`[진단] ${roomId} 방 게임 시작!`);
+            io.to(roomId).emit('gameStarting', room.settings);
+            delete rooms[roomId];
+        }
+    }
+  });
+
   socket.on('playerMovement', (movementData) => {
-    // 이 메시지가 Render 로그에 보여야 합니다.
-    console.log(`[진단] playerMovement 수신 from ${socket.id}:`, movementData);
     const player = players[socket.id] || {};
     player.x = movementData.x;
     player.y = movementData.y;
-    // 다른 모든 클라이언트에게 해당 플레이어가 움직였다고 알림
     socket.broadcast.emit('playerMoved', player);
   });
 
-  // 5. 플레이어가 접속을 끊었을 때 처리
   socket.on('disconnect', () => {
     console.log(`[진단] 플레이어 접속 해제: ${socket.id}`);
-    // players 객체에서 해당 플레이어 정보 삭제
+    const roomId = playerRooms[socket.id];
+    if (rooms[roomId]) {
+        delete rooms[roomId].players[socket.id];
+        if (Object.keys(rooms[roomId].players).length === 0) {
+            delete rooms[roomId];
+            console.log(`[진단] ${roomId} 방이 비어서 삭제됨.`);
+        } else {
+            updateLobbyState(roomId);
+        }
+    }
     delete players[socket.id];
-    // 다른 모든 클라이언트에게 누가 나갔는지 알림
+    delete playerRooms[socket.id];
     io.emit('playerDisconnected', socket.id);
   });
 });

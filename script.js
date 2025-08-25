@@ -66,6 +66,9 @@ const multiplayerChoiceContainer = document.getElementById('multiplayerChoiceCon
 const createNewGameBtn = document.getElementById('createNewGameBtn');
 const joinGameBtn = document.getElementById('joinGameBtn');
 const lobbyContainer = document.getElementById('lobbyContainer');
+const roomInfoContainer = document.getElementById('roomInfoContainer');
+const roomIdDisplay = document.getElementById('roomIdDisplay');
+const copyRoomIdBtn = document.getElementById('copyRoomIdBtn');
 const mazeWidthSelectLobby = document.getElementById('mazeWidthSelectLobby');
 const mazeHeightSelectLobby = document.getElementById('mazeHeightSelectLobby');
 const autoFitButtonLobby = document.getElementById('autoFitButtonLobby');
@@ -115,6 +118,10 @@ let moveSoundTimeout = null;
 // 멀티플레이어 상태
 let socket;
 let otherPlayers = {};
+let playerRole = 'guest'; // 'master' 또는 'guest'
+let isReady = false;
+let currentRoomId = null;
+
 
 // Joystick state
 let isJoystickActive = false;
@@ -294,6 +301,7 @@ function showStartScreen() {
     lobbyContainer.classList.add('hidden');
     customSizeContainer.classList.add('hidden');
     backToGameMode.classList.add('hidden');
+    roomInfoContainer.classList.add('hidden'); // 방 정보 UI도 숨김
 
     document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
     const selectedBtn = document.querySelector(`.control-mode-button[data-mode="${controlMode}"]`);
@@ -301,6 +309,25 @@ function showStartScreen() {
 
     calculateAndDisplayMaxMazeSize();
 }
+
+// 로비 UI를 역할에 맞게 업데이트하는 함수
+function updateLobbyUI(isMaster) {
+    mazeWidthSelectLobby.disabled = !isMaster;
+    mazeHeightSelectLobby.disabled = !isMaster;
+    autoFitButtonLobby.disabled = !isMaster;
+    backToMultiplayerChoiceButton.disabled = !isMaster;
+    
+    if (isMaster) {
+        readyButton.style.display = 'flex';
+        startLobbyButton.style.visibility = 'hidden';
+        roomInfoContainer.classList.remove('hidden'); // Master에게만 방 정보 표시
+    } else { 
+        readyButton.style.display = 'flex';
+        startLobbyButton.style.display = 'none';
+        roomInfoContainer.classList.add('hidden'); // Guest에게는 방 정보 숨김
+    }
+}
+
 
 async function takeScreenshot() {
     playShutterSound();
@@ -547,9 +574,7 @@ function movePlayer(dx, dy) {
         player.x += dx * STEP;
         player.y += dy * STEP;
 
-        // 중요: 내 위치가 변경될 때마다 서버로 정보를 전송!
         if (socket) {
-            console.log("Sending playerMovement to server:", { x: player.x, y: player.y }); // [진단 코드]
             socket.emit('playerMovement', { x: player.x, y: player.y });
         }
 
@@ -689,49 +714,81 @@ function stopJoystick() {
 // 7. 게임 초기화 및 이벤트 리스너 설정 (Initialization & Listeners)
 // ===================================================================
 
-// 소켓 이벤트 리스너들을 모아둘 함수
 function setupSocketListeners() {
-    // [진단 코드] 연결 시도 직후 이벤트
-    socket.on("connect", () => {
-        console.log("Successfully connected to the server with ID:", socket.id);
+    socket.on("connect", () => console.log("서버 연결 성공:", socket.id));
+    socket.on("connect_error", (err) => console.error("서버 연결 실패:", err.message));
+
+    socket.on('roomCreated', ({ roomId }) => {
+        currentRoomId = roomId;
+        roomIdDisplay.textContent = roomId;
+        console.log(`방 생성 완료. ID: ${roomId}`);
     });
 
-    // [진단 코드] 연결 실패 이벤트
-    socket.on("connect_error", (err) => {
-        console.error("Connection failed:", err.message);
+    socket.on('joinSuccess', () => {
+        console.log('방에 성공적으로 참여했습니다.');
+        multiplayerChoiceContainer.classList.add('hidden');
+        lobbyContainer.classList.remove('hidden');
+        updateLobbyUI(false); // Guest로 UI 설정
     });
 
-    // 서버로부터 현재 접속된 플레이어 목록을 받음
-    socket.on('currentPlayers', (players) => {
-        console.log("Received currentPlayers from server:", players); // [진단 코드]
-        Object.keys(players).forEach((id) => {
-            if (players[id].id !== socket.id) {
-                otherPlayers[id] = players[id];
+    socket.on('joinError', ({ message }) => {
+        alert(message);
+    });
+
+    socket.on('lobbyStateUpdate', (lobbyState) => {
+        console.log('로비 상태 업데이트:', lobbyState);
+        if (playerRole === 'guest') {
+            mazeWidthSelectLobby.value = lobbyState.settings.width;
+            mazeHeightSelectLobby.value = lobbyState.settings.height;
+        }
+
+        const allPlayersReady = Object.values(lobbyState.players).every(p => p.isReady);
+
+        if (playerRole === 'master') {
+            if (allPlayersReady) {
+                readyButton.style.display = 'none';
+                startLobbyButton.style.visibility = 'visible';
+                startLobbyButton.disabled = false;
+            } else {
+                readyButton.style.display = 'flex';
+                startLobbyButton.style.visibility = 'hidden';
+                startLobbyButton.disabled = true;
             }
+        }
+    });
+    
+    socket.on('unReadyAllPlayers', () => {
+        console.log('설정 변경으로 모든 플레이어 준비 취소됨');
+        isReady = false;
+        readyButton.textContent = '준비';
+        readyButton.style.backgroundColor = 'var(--color-green-pastel)';
+    });
+
+    socket.on('gameStarting', (settings) => {
+        console.log('게임 시작! 설정:', settings);
+        MAZE_WIDTH = settings.width;
+        MAZE_HEIGHT = settings.height;
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
+        initGame();
+    });
+
+    socket.on('currentPlayers', (players) => {
+        Object.keys(players).forEach((id) => {
+            if (players[id].id !== socket.id) otherPlayers[id] = players[id];
         });
     });
-
-    // 새로운 플레이어가 접속했다는 정보를 받음
-    socket.on('newPlayer', (playerInfo) => {
-        console.log("A new player has joined:", playerInfo); // [진단 코드]
-        otherPlayers[playerInfo.id] = playerInfo;
-    });
-
-    // 다른 플레이어가 움직였다는 정보를 받음
+    socket.on('newPlayer', (playerInfo) => otherPlayers[playerInfo.id] = playerInfo);
     socket.on('playerMoved', (playerInfo) => {
-        // console.log("Received playerMoved from server:", playerInfo); // [진단 코드] - 너무 자주 찍히므로 일단 주석 처리
         if (otherPlayers[playerInfo.id]) {
             otherPlayers[playerInfo.id].x = playerInfo.x;
             otherPlayers[playerInfo.id].y = playerInfo.y;
         }
     });
-
-    // 플레이어가 나갔다는 정보를 받음
-    socket.on('playerDisconnected', (playerId) => {
-        console.log("A player has disconnected:", playerId); // [진단 코드]
-        delete otherPlayers[playerId];
-    });
+    socket.on('playerDisconnected', (playerId) => delete otherPlayers[playerId]);
 }
+
 
 function initGame() {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -840,34 +897,74 @@ function setupEventListeners() {
     backToGameMode.addEventListener('click', showStartScreen);
 
     createNewGameBtn.addEventListener('click', () => {
+        playerRole = 'master';
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
+        updateLobbyUI(true);
+        socket.emit('createGame', {
+            width: parseInt(mazeWidthSelectLobby.value),
+            height: parseInt(mazeHeightSelectLobby.value)
+        });
     });
+
+    joinGameBtn.addEventListener('click', () => {
+        playerRole = 'guest';
+        const roomId = prompt("참여할 방의 ID를 입력하세요:");
+        if (roomId) {
+            socket.emit('joinGame', { roomId });
+        }
+    });
+
+    copyRoomIdBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(roomIdDisplay.textContent).then(() => {
+            copyRoomIdBtn.textContent = '복사 완료!';
+            setTimeout(() => { copyRoomIdBtn.textContent = 'ID 복사'; }, 2000);
+        }).catch(err => {
+            console.error('ID 복사 실패:', err);
+        });
+    });
+
 
     backToMultiplayerChoiceButton.addEventListener('click', () => {
         lobbyContainer.classList.add('hidden');
         multiplayerChoiceContainer.classList.remove('hidden');
+        // To-Do: 방에서 나가는 로직 (socket.emit('leaveRoom'))
     });
 
     autoFitButtonLobby.addEventListener('click', () => {
         const { maxWidth, maxHeight } = calculateMaxMazeSize();
         mazeWidthSelectLobby.value = maxWidth;
         mazeHeightSelectLobby.value = maxHeight;
+        if (playerRole === 'master') {
+            socket.emit('settingsChanged', { 
+                width: maxWidth, 
+                height: maxHeight 
+            });
+        }
+    });
+    
+    [mazeWidthSelectLobby, mazeHeightSelectLobby].forEach(select => {
+        select.addEventListener('change', () => {
+            if (playerRole === 'master') {
+                socket.emit('settingsChanged', {
+                    width: parseInt(mazeWidthSelectLobby.value),
+                    height: parseInt(mazeHeightSelectLobby.value)
+                });
+            }
+        });
     });
 
     readyButton.addEventListener('click', () => {
-        readyButton.textContent = '준비 완료!';
-        readyButton.style.backgroundColor = 'var(--color-blue-pastel)';
-        // 여기에 다른 플레이어에게 준비 상태를 알리는 로직 추가 (socket.emit)
+        isReady = !isReady;
+        readyButton.textContent = isReady ? '준비 완료!' : '준비';
+        readyButton.style.backgroundColor = isReady ? 'var(--color-blue-pastel)' : 'var(--color-green-pastel)';
+        socket.emit('playerReady', { isReady });
     });
 
     startLobbyButton.addEventListener('click', () => {
-        MAZE_WIDTH = parseInt(mazeWidthSelectLobby.value);
-        MAZE_HEIGHT = parseInt(mazeHeightSelectLobby.value);
-        mainLayout.className = `main-layout mode-${controlMode}`;
-        startScreenModal.style.display = 'none';
-        mainLayout.style.display = 'flex';
-        initGame();
+        if (playerRole === 'master') {
+            socket.emit('startGame');
+        }
     });
 
 
@@ -880,7 +977,7 @@ function setupEventListeners() {
         if (key === 'q') return handleQButton();
         if (key === 'w') return handleWButton();
 
-        switch (e.key) { // Use e.key to capture "Arrow..."
+        switch (e.key) {
             case 'ArrowUp': movePlayer(0, -1); break;
             case 'ArrowDown': movePlayer(0, 1); break;
             case 'ArrowLeft': movePlayer(-1, 0); break;
@@ -925,14 +1022,11 @@ function setupEventListeners() {
         isSoundOn = !isSoundOn;
         soundToggleButton.textContent = isSoundOn ? '🔊' : '🔇';
         
-        // Mute all HTML audio elements
         const allHtmlAudio = [gallopingSound, spotSaveSound, spotLoadSound, pastStepSound, clearSound];
         allHtmlAudio.forEach(audio => audio.muted = !isSoundOn);
         
-        // Mute Tone.js library
         if(audioContextResumed) Tone.Destination.mute = !isSoundOn;
 
-        // If turning sound off, immediately stop any playing sounds
         if (!isSoundOn && gallopingSound && !gallopingSound.paused) {
             gallopingSound.pause();
         }
@@ -996,17 +1090,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     populateSizeDropdowns();
-    populateLobbySizeDropdowns(); // 로비 드롭다운 채우기
+    populateLobbySizeDropdowns();
     setupEventListeners();
     initAudio();
     showStartScreen();
 
-    // 서버에 접속하는 로직 추가
     try {
-        console.log("서버에 접속 시도 중... 주소:", "https://miromulti.onrender.com"); // [진단 코드]
+        console.log("서버에 접속 시도 중... 주소:", "https://miromulti.onrender.com");
         socket = io("https://miromulti.onrender.com"); 
-        setupSocketListeners(); // 소켓 이벤트 리스너 설정 함수 호출
+        setupSocketListeners();
     } catch (e) {
-        console.error("서버 연결 시도 중 즉시 에러 발생:", e); // [진단 코드]
+        console.error("서버 연결 시도 중 즉시 에러 발생:", e);
     }
 });
