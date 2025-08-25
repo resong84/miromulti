@@ -1,0 +1,552 @@
+/* =================================================================== */
+/* 1. Root Variables (CSS 변수) */
+/* =================================================================== */
+:root {
+    /* Colors */
+    --color-bg-light: #f0f0f0;
+    --color-bg-main: #ffffff;
+    --color-text-primary: #333333;
+    --color-text-secondary: #555555;
+    --color-text-light: #888888;
+    --color-text-inverted: #ffffff;
+    --color-text-shadow: rgba(0, 0, 0, 0.5);
+    --color-border: #333333;
+    --color-shadow: rgba(0, 0, 0, 0.1);
+    --color-shadow-dark: rgba(0, 0, 0, 0.15);
+    
+    /* Button Colors (Pastel) */
+    --color-red-pastel: #FFB6C1;
+    --color-red-pastel-dark: #FF9AA4;
+    --color-red-pastel-darker: #FF7F8C;
+    --color-orange-pastel: #FFDAB9;
+    --color-yellow-pastel: #FFFACD;
+    --color-green-pastel: #BDECB6;
+    --color-green-pastel-dark: #A7D8A0;
+    --color-green-pastel-darker: #92C38A;
+    --color-blue-pastel: #A7C7E7;
+    --color-blue-pastel-dark: #92B4D8;
+    --color-blue-pastel-darker: #7D9CC9;
+    --color-purple-pastel: #C3B1E1;
+    
+    /* Special Colors */
+    --color-start-button: #4F46E5;
+    --color-start-button-hover: #4338CA;
+    --color-start-button-active: #3730A3;
+    --color-error: #EF4444;
+
+    /* Sizing & Radius */
+    --radius-large: 16px;
+    --radius-medium: 12px;
+    --radius-small: 8px;
+}
+
+
+/* =================================================================== */
+/* 2. General Body & Layout */
+/* =================================================================== */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-bg-light);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.main-layout {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 600px;
+    height: calc(100vh - 40px);
+    box-sizing: border-box;
+    background-color: var(--color-bg-main);
+    border-radius: var(--radius-large);
+    box-shadow: 0 10px 25px var(--color-shadow);
+    overflow: hidden;
+    padding: 0;
+    transition: height 0.3s ease;
+}
+.game-header {
+    height: 75%;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 5px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    transition: height 0.3s ease, padding 0.3s ease;
+}
+.game-footer {
+    height: 25%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 2px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    margin-top: auto;
+    overflow-y: hidden;
+    transition: height 0.3s ease;
+}
+canvas {
+    border: 2px solid var(--color-border);
+    background-color: #eee;
+    display: block;
+    border-radius: var(--radius-small);
+    touch-action: none;
+}
+.controls-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-top: 0;
+    width: 100%;
+}
+
+/* =================================================================== */
+/* 3. Control Mode Switching & Layout */
+/* =================================================================== */
+.main-layout.mode-keyboard .joystick-controls { display: none; }
+.main-layout.mode-joystick .keyboard-controls { display: none; }
+.keyboard-controls, .joystick-controls { width: 100%; }
+
+/* --- Keyboard Controls --- */
+.main-controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    margin: 0 auto;
+    gap: 15px;
+}
+.directional-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    width: 170px;
+    flex-shrink: 0;
+}
+.directional-row {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+}
+.directional-row.top-row {
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 0 5px;
+    box-sizing: border-box;
+}
+.directional-row.middle-row { justify-content: center; }
+
+/* --- Joystick Controls --- */
+.joystick-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+.joystick-base {
+    width: 80px;
+    height: 80px;
+    background-color: var(--color-bg-light);
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 5px 15px rgba(0,0,0,0.2);
+}
+.joystick-knob {
+    width: 60px;
+    height: 60px;
+    background-color: var(--color-red-pastel);
+    border-radius: 50%;
+    position: absolute;
+    cursor: grab;
+    transition: transform 0.1s ease-out;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+.joystick-knob:active { cursor: grabbing; }
+
+/* =================================================================== */
+/* 4. Buttons & Interactive Elements */
+/* =================================================================== */
+
+/* Base class for common button styles */
+.game-button-base {
+    background-color: var(--color-bg-main);
+    color: #000000;
+    border-radius: var(--radius-medium);
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 4px 6px var(--color-shadow);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-shadow: 1px 1px 2px var(--color-text-shadow);
+    padding: 0;
+}
+.game-button-base:hover {
+    background-color: var(--color-bg-light);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px var(--color-shadow-dark);
+}
+.game-button-base:active {
+    background-color: #D0D0D0;
+    transform: translateY(0);
+    box-shadow: 0 2px 4px var(--color-shadow);
+}
+.game-button-base:disabled {
+    background-color: #cccccc;
+    color: var(--color-text-light);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Specific button styles */
+.arrow-button {
+    width: 52px; /* 수정됨 */
+    height: 52px; /* 수정됨 */
+    font-size: 1.8rem;
+}
+
+/* Rollback Buttons */
+.rollback-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 120px;
+    height: 60px;
+}
+.rollback-button {
+    width: 50px;
+    height: 50px;
+    border-radius: var(--radius-small);
+    font-weight: bold;
+    color: var(--color-text-inverted);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column; /* 수정됨 */
+    justify-content: center; /* 수정됨 */
+    align-items: center; /* 수정됨 */
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 2px 4px var(--color-shadow);
+    border: none;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    line-height: 1.1; /* 수정됨 */
+    padding: 4px 0; /* 수정됨 */
+}
+.rollback-button:hover { transform: scale(1.05); }
+.rollback-button:active { transform: scale(0.95); }
+.rollback-button.red { background-color: var(--color-red-pastel); }
+.rollback-button.blue { background-color: var(--color-blue-pastel); }
+
+/* Top action buttons & Timer */
+.game-info-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 0;
+    flex-wrap: wrap; 
+}
+.timer-display {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-light);
+    padding: 8px 16px;
+    border-radius: var(--radius-small);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+.action-button {
+    background-color: var(--color-green-pastel);
+    color: var(--color-text-inverted);
+    padding: 8px 16px;
+    border-radius: var(--radius-medium);
+    font-size: 1.0rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 4px 6px var(--color-shadow);
+    border: none;
+    white-space: nowrap;
+}
+.action-button:hover {
+    background-color: var(--color-green-pastel-dark);
+    transform: translateY(-2px);
+}
+.action-button:active {
+    background-color: var(--color-green-pastel-darker);
+    transform: translateY(0);
+    box-shadow: 0 2px 4px var(--color-shadow);
+}
+.reset-size-button { background-color: var(--color-red-pastel); }
+.reset-size-button:hover { background-color: var(--color-red-pastel-dark); }
+.reset-size-button:active { background-color: var(--color-red-pastel-darker); }
+
+.help-button {
+    background-color: var(--color-blue-pastel);
+    color: var(--color-text-inverted);
+    padding: 8px 12px;
+    border-radius: var(--radius-medium);
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 4px 6px var(--color-shadow);
+}
+.help-button:hover {
+    background-color: var(--color-blue-pastel-dark);
+    transform: translateY(-2px);
+}
+.help-button:active {
+    background-color: var(--color-blue-pastel-darker);
+    transform: translateY(0);
+    box-shadow: 0 2px 4px var(--color-shadow);
+}
+
+/* --- 추가/수정된 스타일 --- */
+.left-control-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.text-actions-row {
+    display: flex;
+    gap: 10px;
+}
+.multi-line-action-button {
+    background-color: var(--color-purple-pastel);
+    color: var(--color-text-inverted);
+    border-radius: var(--radius-small);
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: none;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 0;
+    line-height: 1.1;
+}
+.multi-line-action-button:hover { transform: scale(1.05); }
+.multi-line-action-button:active { transform: scale(0.95); }
+.multi-line-action-button:disabled {
+    background-color: #cccccc;
+    color: #888888;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.key-char {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+.key-desc {
+    font-size: 0.7rem;
+    font-weight: normal;
+}
+.rollback-num { /* 추가됨 */
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+.rollback-desc { /* 추가됨 */
+    font-size: 0.7rem;
+    font-weight: normal;
+}
+.placeholder-button {
+    width: 50px;
+    height: 50px;
+    visibility: hidden;
+}
+
+/* =================================================================== */
+/* 5. Modals (Start, Win, Help, Screenshot) & Overlays */
+/* =================================================================== */
+.start-screen-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.start-screen-content {
+    background-color: var(--color-bg-main);
+    padding: 30px;
+    border-radius: var(--radius-large);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    max-width: 400px; width: 90%;
+    display: flex; flex-direction: column; gap: 20px;
+}
+.start-screen-content h2 {
+    font-size: 2rem; font-weight: bold;
+    color: var(--color-text-primary); margin-bottom: 10px;
+}
+.maze-size-input-group {
+    display: flex; flex-direction: column;
+    gap: 10px; align-items: center;
+}
+.maze-size-input-group label {
+    font-size: 1.1rem; color: var(--color-text-secondary);
+}
+.maze-size-input {
+    display: flex; gap: 10px;
+    justify-content: center; align-items: center;
+}
+.maze-size-input input, .maze-size-input select {
+    width: 80px; padding: 8px 12px;
+    border: 2px solid #ccc; border-radius: var(--radius-small);
+    font-size: 1rem; text-align: center;
+    -moz-appearance: textfield;
+}
+.maze-size-input input::-webkit-outer-spin-button,
+.maze-size-input input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+}
+.size-limit-text {
+    font-size: 0.9rem; color: var(--color-text-light); margin-top: 5px;
+}
+.start-button {
+    background-color: var(--color-start-button);
+    color: var(--color-text-inverted);
+    padding: 14px 28px; border-radius: var(--radius-medium);
+    font-size: 1.2rem; font-weight: bold; cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 6px 10px var(--color-shadow-dark);
+    border: none;
+    flex-grow: 1;
+}
+.start-button:hover {
+    background-color: var(--color-start-button-hover);
+    transform: translateY(-3px);
+}
+.start-button:active {
+    background-color: var(--color-start-button-active);
+    transform: translateY(0);
+    box-shadow: 0 2px 5px var(--color-shadow);
+}
+.start-screen-error {
+    color: var(--color-error); font-size: 0.9rem;
+    margin-top: -10px; display: none;
+}
+.win-modal, .help-modal, .screenshot-modal {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 2000; display: none;
+}
+.win-modal-content, .help-modal-content, .screenshot-modal-content {
+    background-color: var(--color-bg-main);
+    padding: 30px; border-radius: var(--radius-large);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    text-align: center; max-width: 90%;
+    width: 450px; display: flex; flex-direction: column;
+    gap: 20px; align-items: center;
+}
+.win-message-line {
+    font-size: 1.8rem; font-weight: bold;
+    color: var(--color-text-primary); margin: 0;
+    line-height: 1.2;
+}
+#winEmoji {
+    font-size: 6rem;
+    animation: bounce 1s infinite alternate;
+}
+@keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-15px); }
+}
+.help-message-title { font-size: 1.8rem; font-weight: bold; color: var(--color-text-primary); }
+.help-message-content { font-size: 1rem; color: var(--color-text-secondary); text-align: left; line-height: 1.5; }
+.win-modal-buttons {
+    display: flex; gap: 10px;
+    justify-content: center; width: 100%;
+    flex-wrap: wrap;
+}
+#winRestartButton, #shareButton, #closeHelpModalButton, #closeScreenshotModalButton, #winHomeButton {
+    margin-top: 0;
+    background-color: var(--color-blue-pastel);
+    padding: 8px 16px;
+    font-size: 1.1rem;
+    border-radius: var(--radius-medium);
+    flex-grow: 1;
+}
+#winHomeButton { background-color: var(--color-green-pastel); }
+#winRestartButton:hover, #shareButton:hover, #closeHelpModalButton:hover, #closeScreenshotModalButton:hover, #winHomeButton:hover {
+    background-color: var(--color-blue-pastel-dark);
+}
+#winHomeButton:hover { background-color: var(--color-green-pastel-dark); }
+#winRestartButton:active, #shareButton:active, #closeHelpModalButton:active, #closeScreenshotModalButton:active, #winHomeButton:active {
+    background-color: var(--color-blue-pastel-darker);
+}
+#winHomeButton:active { background-color: var(--color-green-pastel-darker); }
+.screenshot-modal-content img {
+    max-width: 100%; height: auto;
+    border-radius: var(--radius-small);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+.flash-overlay {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: white; opacity: 0;
+    z-index: 3000; pointer-events: none;
+}
+.flash-effect { animation: flash 0.3s ease-out forwards; }
+@keyframes flash {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* =================================================================== */
+/* 6. Responsive Adjustments */
+/* =================================================================== */
+@media (max-width: 640px) {
+    .main-layout { padding: 16px; height: 100vh; }
+    .game-header { height: 60%; }
+    .game-footer { height: 40%; }
+    .directional-controls { width: 120px; height: auto; gap: 3px; }
+    .arrow-button { width: 47px; height: 47px; font-size: 1.5rem; }
+    .action-button { padding: 8px 12px; font-size: 0.9rem; }
+    .timer-display { font-size: 1.1rem; padding: 6px 12px; }
+    .start-screen-content { padding: 20px; gap: 15px; }
+    .start-screen-content h2 { font-size: 1.7rem; }
+    .maze-size-input input, .maze-size-input select { width: 70px; font-size: 0.9rem; }
+    .start-button { padding: 12px 24px; font-size: 1.1rem; }
+    .rollback-button { width: 45px; height: 45px; }
+    .rollback-num { font-size: 1rem; }
+    .rollback-desc { font-size: 0.6rem; }
+    .multi-line-action-button { width: 45px; height: 45px; }
+    .key-char { font-size: 1rem; }
+    .key-desc { font-size: 0.6rem; }
+    .main-controls-row { gap: 10px; }
+    .rollback-group { width: 100px; height: 50px; }
+    #winEmoji { font-size: 4rem; }
+}

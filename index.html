@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>미로 찾기 게임</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Socket.IO Client Library -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100">
+    <!-- Start Screen Modal -->
+    <div id="startScreenModal" class="start-screen-modal">
+        <div class="start-screen-content">
+            <h2>미로 찾기 게임</h2>
+            
+            <div class="maze-size-input-group">
+                <label>조작 방식 선택:</label>
+                <div id="controlModeContainer" class="flex gap-2 justify-center">
+                    <button class="action-button control-mode-button" data-mode="keyboard" aria-label="키보드 조작 방식 선택">키보드 방식</button>
+                    <button class="action-button control-mode-button" data-mode="joystick" aria-label="조이스틱 조작 방식 선택">조이스틱 방식</button>
+                </div>
+            </div>
+
+            <div class="maze-size-input-group">
+                <label>미로 크기 선택:</label>
+                <div id="ageButtonsContainer" class="flex gap-2 flex-wrap justify-center">
+                    <button class="action-button age-button" data-size="43" aria-label="5세용 43x43 크기 선택">5세: 43 x 43</button>
+                    <button class="action-button age-button" data-size="55" aria-label="6세용 55x55 크기 선택">6세: 55 x 55</button>
+                    <button class="action-button age-button" data-size="67" aria-label="7세용 67x67 크기 선택">7세: 67 x 67</button>
+                    <button id="customSizeBtn" class="action-button" aria-label="미로 크기 직접 설정하기">직접 설정</button>
+                    <button id="autoFitButton" class="action-button" style="background-color: #A7C7E7;" aria-label="현재 화면에 맞는 최대 크기로 시작">최대 크기</button>
+                </div>
+            </div>
+            <div id="customSizeContainer" class="maze-size-input-group hidden">
+                <label for="mazeWidthSelect">직접 설정 (가로 x 세로):</label>
+                <div class="maze-size-input">
+                    <select id="mazeWidthSelect" aria-label="미로 가로 크기 선택"></select>
+                    <span>x</span>
+                    <select id="mazeHeightSelect" aria-label="미로 세로 크기 선택"></select>
+                </div>
+                <p class="size-limit-text">크기를 선택해주세요.</p>
+                <div class="flex gap-2 mt-2">
+                    <button id="backToPresetButton" class="action-button reset-size-button">돌아가기</button>
+                    <button id="startButton" class="start-button">게임 시작</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-layout" style="display: none;">
+        <header class="game-header">
+            <canvas id="mazeCanvas"></canvas>
+        </header>
+
+        <footer class="game-footer">
+            <div class="game-info-container">
+                <button id="resetSizeButton" class="action-button reset-size-button">크기 설정</button>
+                <div id="timer" class="timer-display" aria-live="polite">00분00초00</div>
+                <button id="restartButton" class="action-button">다시 시작</button>
+                <button id="soundToggleButton" class="action-button" aria-label="소리 켜기/끄기">🔊</button>
+                <button id="helpButton" class="help-button" aria-label="도움말 보기">?</button>
+            </div>
+
+            <div class="message-box" id="messageBox"></div>
+
+            <div class="controls-wrapper">
+                <!-- Keyboard Controls UI -->
+                <div class="keyboard-controls">
+                    <div class="main-controls-row">
+                        <div class="left-control-stack">
+                            <div class="rollback-group" role="group" aria-label="위치 저장/이동 그룹">
+                                <!-- 롤백 버튼 UI 수정 -->
+                                <button id="rollback1_left" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
+                                    <span class="rollback-num">1</span>
+                                    <span class="rollback-desc">위치저장</span>
+                                </button>
+                                <button id="rollback2_left" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
+                                    <span class="rollback-num">2</span>
+                                    <span class="rollback-desc">위치저장</span>
+                                </button>
+                            </div>
+                            <div class="text-actions-row">
+                                <button id="qButton" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
+                                    <span class="key-char">Q</span>
+                                    <span class="key-desc">시작위치</span>
+                                </button>
+                                <button id="eButton" class="multi-line-action-button" aria-label="지나온 동선 표시">
+                                    <span class="key-char">W</span>
+                                    <span class="key-desc">동선</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="directional-controls" role="group" aria-label="방향키">
+                            <div class="directional-row top-row">
+                                <div class="placeholder-button"></div>
+                                <button id="up" class="game-button-base arrow-button" aria-label="위로 이동">⬆️</button>
+                                <div class="placeholder-button"></div>
+                            </div>
+                            <div class="directional-row middle-row">
+                                <button id="left" class="game-button-base arrow-button" aria-label="왼쪽으로 이동">⬅️</button>
+                                <button id="down" class="game-button-base arrow-button" aria-label="아래로 이동">⬇️</button>
+                                <button id="right" class="game-button-base arrow-button" aria-label="오른쪽으로 이동">➡️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Joystick Controls UI -->
+                <div class="joystick-controls">
+                    <div class="left-control-stack">
+                        <div class="rollback-group" role="group" aria-label="조이스틱 위치 저장/이동 그룹">
+                            <!-- 롤백 버튼 UI 수정 -->
+                            <button id="rollback1_joystick" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
+                                <span class="rollback-num">1</span>
+                                <span class="rollback-desc">위치저장</span>
+                            </button>
+                            <button id="rollback2_joystick" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
+                                <span class="rollback-num">2</span>
+                                <span class="rollback-desc">위치저장</span>
+                            </button>
+                        </div>
+                        <div class="text-actions-row">
+                            <button id="qButton_joystick" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
+                                <span class="key-char">Q</span>
+                                <span class="key-desc">시작위치</span>
+                            </button>
+                            <button id="eButton_joystick" class="multi-line-action-button" aria-label="지나온 동선 표시">
+                                <span class="key-char">W</span>
+                                <span class="key-desc">동선</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="joystickBase" class="joystick-base" role="button" aria-label="조이스틱 컨트롤러">
+                        <div id="joystickKnob" class="joystick-knob"></div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <div id="winModal" class="win-modal">
+        <div class="win-modal-content">
+            <p class="win-message-line">축하합니다!</p>
+            <p id="winTimeMessage" class="win-message-line"></p>
+            <p id="winMazeSizeMessage" class="win-message-line"></p>
+            <span id="winEmoji">🎉</span>
+            <div class="win-modal-buttons">
+                <button id="winHomeButton" class="action-button">처음으로</button>
+                <button id="winRestartButton" class="action-button">다시 시작</button>
+                <button id="shareButton" class="action-button" aria-label="게임 결과 공유하기">공유</button>
+            </div>
+        </div>
+    </div>
+    <div id="helpModal" class="help-modal">
+        <div class="help-modal-content">
+            <h2 class="help-message-title">미로 찾기 게임 설명</h2>
+            <p class="help-message-content">
+                <strong>게임 목표:</strong> 말(플레이어)을 시작 지점(⛩️)에서 도착 지점(🚩)까지 이동시켜 미로를 탈출하세요.<br><br>
+                <strong>조작법:</strong><br>
+                - <strong>키보드 방식:</strong> 키보드의 화살표 키(⬆️⬇️⬅️➡️)를 사용하세요.<br>
+                - <strong>조이스틱 방식:</strong> 화면의 조이스틱을 드래그하여 이동합니다.<br>
+                - <strong>Q 버튼 (시작위치):</strong> 시작 지점으로 즉시 이동합니다. (게임당 1회)<br>
+                - <strong>W 버튼 (동선):</strong> 지나온 길을 표시합니다. (게임당 1회)<br><br>
+                <strong>특수 기능:</strong><br>
+                - <strong>롤백 (1, 2):</strong> 현재 위치를 저장하거나, 저장된 위치로 이동합니다.<br><br>
+                <strong>게임 관리:</strong><br>
+                - <strong>크기 설정:</strong> 시작 화면으로 돌아가 새로운 미로 크기를 설정합니다.<br>
+                - <strong>다시 시작:</strong> 현재 크기로 새로운 미로를 생성하여 재시작합니다.<br>
+            </p>
+            <button id="closeHelpModalButton" class="action-button">닫기</button>
+        </div>
+    </div>
+    <div id="screenshotModal" class="screenshot-modal">
+        <div class="screenshot-modal-content">
+            <h2>클립보드에 복사됨!</h2>
+            <img id="screenshotImage" src="" alt="게임 스크린샷">
+            <button id="closeScreenshotModalButton" class="action-button">닫기</button>
+        </div>
+    </div>
+    <div id="flashOverlay" class="flash-overlay"></div>
+
+    <!-- Audio Files -->
+    <audio id="gallopingSound" src="Galloping Horse Sound.mp3" loop></audio>
+    <audio id="spotSaveSound" src="spotloofsave.mp3"></audio>
+    <audio id="spotLoadSound" src="spotloofload.mp3"></audio>
+    <audio id="pastStepSound" src="paststep.mp3"></audio>
+    <audio id="clearSound" src="clear.mp3"></audio>
+
+    <!-- External JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
