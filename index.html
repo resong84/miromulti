@@ -34,8 +34,8 @@
                 <div class="maze-size-input-group">
                     <label>조작 방식 선택:</label>
                     <div id="controlModeContainer" class="flex gap-2 justify-center">
-                        <button class="action-button control-mode-button" data-mode="keyboard" aria-label="키보드 조작 방식 선택">키보드 방식</button>
-                        <button class="action-button control-mode-button" data-mode="joystick" aria-label="조이스틱 조작 방식 선택">조이스틱 방식</button>
+                        <button class="action-button control-mode-button" data-mode="keyboard">키보드 방식</button>
+                        <button class="action-button control-mode-button" data-mode="joystick">조이스틱 방식</button>
                     </div>
                 </div>
                 <div class="maze-size-input-group">
@@ -97,22 +97,21 @@
         </div>
     </div>
 
-    <!-- 방 목록 모달 (새로 추가) -->
-    <div id="roomListModal" class="help-modal"> <!-- 기존 help-modal 스타일 재사용 -->
+    <!-- 방 목록 모달 -->
+    <div id="roomListModal" class="help-modal">
         <div class="help-modal-content">
             <h2 class="help-message-title">참여 가능한 방 목록</h2>
-            <div id="roomListContainer" class="w-full mt-4 flex flex-col gap-2" style="max-height: 300px; overflow-y: auto;">
-                <!-- 방 목록이 여기에 동적으로 추가됩니다. -->
-            </div>
+            <div id="roomListContainer" class="w-full mt-4 flex flex-col gap-2" style="max-height: 300px; overflow-y: auto;"></div>
             <button id="closeRoomListModalButton" class="action-button mt-4">닫기</button>
         </div>
     </div>
 
+    <!-- 게임 화면 -->
     <div class="main-layout" style="display: none;">
         <header class="game-header">
             <canvas id="mazeCanvas"></canvas>
         </header>
-        <footer class="game-footer">
+        <footer class="game-footer relative">
             <div class="game-info-container">
                 <button id="resetSizeButton" class="action-button reset-size-button">크기 설정</button>
                 <div id="timer" class="timer-display" aria-live="polite">00분00초00</div>
@@ -122,63 +121,93 @@
             </div>
             <div class="message-box" id="messageBox"></div>
             <div class="controls-wrapper">
+                <!-- Keyboard Controls UI -->
                 <div class="keyboard-controls">
                     <div class="main-controls-row">
                         <div class="left-control-stack">
-                            <div class="rollback-group" role="group">
-                                <button id="rollback1_left" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
-                                <button id="rollback2_left" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
+                            <div class="rollback-group" role="group" aria-label="위치 저장/이동 그룹">
+                                <button id="rollback1_left" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
+                                    <span class="rollback-num">1</span>
+                                    <span class="rollback-desc">위치저장</span>
+                                </button>
+                                <button id="rollback2_left" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
+                                    <span class="rollback-num">2</span>
+                                    <span class="rollback-desc">위치저장</span>
+                                </button>
                             </div>
                             <div class="text-actions-row">
-                                <button id="qButton" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
-                                <button id="wButton" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
+                                <button id="qButton" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
+                                    <span class="key-char">Q</span>
+                                    <span class="key-desc">시작위치</span>
+                                </button>
+                                <button id="wButton" class="multi-line-action-button" aria-label="지나온 동선 표시">
+                                    <span class="key-char">W</span>
+                                    <span class="key-desc">동선</span>
+                                </button>
                             </div>
                         </div>
-                        <div class="directional-controls" role="group">
+                        <div class="directional-controls" role="group" aria-label="방향키">
                             <div class="directional-row top-row">
                                 <div class="placeholder-button"></div>
-                                <button id="up" class="game-button-base arrow-button">⬆️</button>
+                                <button id="up" class="game-button-base arrow-button" aria-label="위로 이동">⬆️</button>
                                 <div class="placeholder-button"></div>
                             </div>
                             <div class="directional-row middle-row">
-                                <button id="left" class="game-button-base arrow-button">⬅️</button>
-                                <button id="down" class="game-button-base arrow-button">⬇️</button>
-                                <button id="right" class="game-button-base arrow-button">➡️</button>
+                                <button id="left" class="game-button-base arrow-button" aria-label="왼쪽으로 이동">⬅️</button>
+                                <button id="down" class="game-button-base arrow-button" aria-label="아래로 이동">⬇️</button>
+                                <button id="right" class="game-button-base arrow-button" aria-label="오른쪽으로 이동">➡️</button>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Joystick Controls UI -->
                 <div class="joystick-controls">
                     <div class="left-control-stack">
-                        <div class="rollback-group" role="group">
-                            <button id="rollback1_joystick" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
-                            <button id="rollback2_joystick" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
+                        <div class="rollback-group" role="group" aria-label="조이스틱 위치 저장/이동 그룹">
+                            <button id="rollback1_joystick" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
+                                <span class="rollback-num">1</span>
+                                <span class="rollback-desc">위치저장</span>
+                            </button>
+                            <button id="rollback2_joystick" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
+                                <span class="rollback-num">2</span>
+                                <span class="rollback-desc">위치저장</span>
+                            </button>
                         </div>
                         <div class="text-actions-row">
-                            <button id="qButton_joystick" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
-                            <button id="wButton_joystick" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
+                            <button id="qButton_joystick" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
+                                <span class="key-char">Q</span>
+                                <span class="key-desc">시작위치</span>
+                            </button>
+                            <button id="wButton_joystick" class="multi-line-action-button" aria-label="지나온 동선 표시">
+                                <span class="key-char">W</span>
+                                <span class="key-desc">동선</span>
+                            </button>
                         </div>
                     </div>
-                    <div id="joystickBase" class="joystick-base" role="button">
+                    <div id="joystickBase" class="joystick-base" role="button" aria-label="조이스틱 컨트롤러">
                         <div id="joystickKnob" class="joystick-knob"></div>
                     </div>
                 </div>
             </div>
+
+            <!-- 개별 클리어 시 나타나는 오버레이 -->
+            <div id="finishOverlay" class="absolute inset-0 bg-white bg-opacity-30 backdrop-blur-sm flex items-center justify-center hidden">
+                <p id="finishRankText" class="text-5xl font-bold text-gray-800" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"></p>
+            </div>
         </footer>
     </div>
 
-    <!-- Other Modals -->
+    <!-- 전체 화면 오버레이 (카운트다운, 플래시 등) -->
+    <div id="flashOverlay" class="flash-overlay"></div>
+    <div id="countdownOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[4000] hidden">
+        <p id="countdownText" class="text-9xl font-bold text-white"></p>
+    </div>
+
+    <!-- Modals -->
     <div id="winModal" class="win-modal">
-        <div class="win-modal-content">
-            <p class="win-message-line">축하합니다!</p>
-            <p id="winTimeMessage" class="win-message-line"></p>
-            <p id="winMazeSizeMessage" class="win-message-line"></p>
-            <span id="winEmoji">🎉</span>
-            <div class="win-modal-buttons">
-                <button id="winHomeButton" class="action-button">처음으로</button>
-                <button id="winRestartButton" class="action-button">다시 시작</button>
-                <button id="shareButton" class="action-button">공유</button>
-            </div>
+        <div id="winModalContent" class="win-modal-content">
+            <!-- 내용이 동적으로 채워집니다 -->
         </div>
     </div>
     <div id="helpModal" class="help-modal">
@@ -207,7 +236,6 @@
             <button id="closeScreenshotModalButton" class="action-button">닫기</button>
         </div>
     </div>
-    <div id="flashOverlay" class="flash-overlay"></div>
 
     <!-- Audio Files -->
     <audio id="gallopingSound" src="Galloping Horse Sound.mp3" loop></audio>
