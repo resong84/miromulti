@@ -22,35 +22,70 @@
         <div class="start-screen-content">
             <h2>미로 찾기 게임</h2>
             
-            <div class="maze-size-input-group">
-                <label>조작 방식 선택:</label>
-                <div id="controlModeContainer" class="flex gap-2 justify-center">
-                    <button class="action-button control-mode-button" data-mode="keyboard" aria-label="키보드 조작 방식 선택">키보드 방식</button>
-                    <button class="action-button control-mode-button" data-mode="joystick" aria-label="조이스틱 조작 방식 선택">조이스틱 방식</button>
+            <!-- Landing Page View -->
+            <div id="landingPageView">
+                <div class="maze-size-input-group">
+                    <label>게임 방식:</label>
+                    <div class="flex gap-2 justify-center">
+                        <button id="playTogetherBtn" class="action-button" style="background-color: var(--color-green-pastel);" aria-label="다른 사람과 함께하기">함께하기</button>
+                    </div>
+                </div>
+                <hr class="my-4">
+                <div class="maze-size-input-group">
+                    <label>혼자하기 (미로 크기 선택):</label>
+                    <div id="ageButtonsContainer" class="flex gap-2 flex-wrap justify-center">
+                        <button class="action-button age-button" data-size="43" aria-label="5세용 43x43 크기 선택">5세: 43 x 43</button>
+                        <button class="action-button age-button" data-size="55" aria-label="6세용 55x55 크기 선택">6세: 55 x 55</button>
+                        <button class="action-button age-button" data-size="67" aria-label="7세용 67x67 크기 선택">7세: 67 x 67</button>
+                        <button id="customSizeBtn" class="action-button" aria-label="미로 크기 직접 설정하기">직접 설정</button>
+                        <button id="autoFitButton" class="action-button" style="background-color: #A7C7E7;" aria-label="현재 화면에 맞는 최대 크기로 시작">최대 크기</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="maze-size-input-group">
-                <label>미로 크기 선택:</label>
-                <div id="ageButtonsContainer" class="flex gap-2 flex-wrap justify-center">
-                    <button class="action-button age-button" data-size="43" aria-label="5세용 43x43 크기 선택">5세: 43 x 43</button>
-                    <button class="action-button age-button" data-size="55" aria-label="6세용 55x55 크기 선택">6세: 55 x 55</button>
-                    <button class="action-button age-button" data-size="67" aria-label="7세용 67x67 크기 선택">7세: 67 x 67</button>
-                    <button id="customSizeBtn" class="action-button" aria-label="미로 크기 직접 설정하기">직접 설정</button>
-                    <button id="autoFitButton" class="action-button" style="background-color: #A7C7E7;" aria-label="현재 화면에 맞는 최대 크기로 시작">최대 크기</button>
+            <!-- Multiplayer Choice View -->
+            <div id="multiplayerChoiceView" class="hidden">
+                <div class="maze-size-input-group">
+                    <button id="createRoomBtn" class="start-button">새로운 게임 만들기</button>
+                    <button id="joinRoomViewBtn" class="start-button" style="background-color: var(--color-blue-pastel);">게임 참여하기</button>
+                    <button id="backToLandingBtn1" class="action-button reset-size-button mt-4">뒤로가기</button>
                 </div>
             </div>
+
+            <!-- Join Room View -->
+            <div id="joinRoomView" class="hidden">
+                 <div class="maze-size-input-group">
+                    <label for="roomIdInput">방 ID를 입력하세요:</label>
+                    <input type="text" id="roomIdInput" class="room-id-input" placeholder="예: ABCD" maxlength="4">
+                    <button id="joinRoomBtn" class="start-button">참여하기</button>
+                    <p id="joinErrorText" class="size-limit-text" style="color: var(--color-error); display: none;"></p>
+                    <button id="backToLobbyChoiceBtn" class="action-button reset-size-button mt-4">뒤로가기</button>
+                </div>
+            </div>
+
+            <!-- Custom Size / Lobby View -->
             <div id="customSizeContainer" class="maze-size-input-group hidden">
-                <label for="mazeWidthSelect">직접 설정 (가로 x 세로):</label>
+                <div id="roomIdDisplay" class="room-id-display hidden">방 ID: <span id="roomIdText"></span></div>
+                <label for="mazeWidthSelect">미로 크기 설정 (가로 x 세로):</label>
                 <div class="maze-size-input">
                     <select id="mazeWidthSelect" aria-label="미로 가로 크기 선택"></select>
                     <span>x</span>
                     <select id="mazeHeightSelect" aria-label="미로 세로 크기 선택"></select>
+                    <button id="lobbyAutoFitButton" class="action-button" style="font-size: 0.8rem; padding: 6px 8px;">최대</button>
                 </div>
                 <p class="size-limit-text">크기를 선택해주세요.</p>
-                <div class="flex gap-2 mt-2">
-                    <button id="backToPresetButton" class="action-button reset-size-button">돌아가기</button>
-                    <button id="startButton" class="start-button">게임 시작</button>
+                
+                <div id="playerLobbyView" class="player-lobby-view hidden">
+                    <label>참여한 플레이어:</label>
+                    <div id="playerList" class="player-list"></div>
+                </div>
+
+                <div class="flex gap-2 mt-4">
+                    <button id="backToPresetButton" class="action-button reset-size-button">뒤로가기</button>
+                    <div id="gameStartContainer" class="relative w-full">
+                        <button id="startButton" class="start-button">게임 시작</button>
+                        <button id="readyButton" class="start-button ready-button hidden">준비</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -78,7 +113,6 @@
                     <div class="main-controls-row">
                         <div class="left-control-stack">
                             <div class="rollback-group" role="group" aria-label="위치 저장/이동 그룹">
-                                <!-- 롤백 버튼 UI 수정 -->
                                 <button id="rollback1_left" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
                                     <span class="rollback-num">1</span>
                                     <span class="rollback-desc">위치저장</span>
@@ -118,7 +152,6 @@
                 <div class="joystick-controls">
                     <div class="left-control-stack">
                         <div class="rollback-group" role="group" aria-label="조이스틱 위치 저장/이동 그룹">
-                            <!-- 롤백 버튼 UI 수정 -->
                             <button id="rollback1_joystick" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
                                 <span class="rollback-num">1</span>
                                 <span class="rollback-desc">위치저장</span>
