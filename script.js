@@ -31,9 +31,9 @@ const helpButton = document.getElementById('helpButton');
 const shareButton = document.getElementById('shareButton');
 const autoFitButton = document.getElementById('autoFitButton');
 const qButton = document.getElementById('qButton');
-const eButton = document.getElementById('eButton');
+const wButton = document.getElementById('wButton');
 const qButton_joystick = document.getElementById('qButton_joystick');
-const eButton_joystick = document.getElementById('eButton_joystick');
+const wButton_joystick = document.getElementById('wButton_joystick');
 const backToPresetButton = document.getElementById('backToPresetButton');
 const soundToggleButton = document.getElementById('soundToggleButton');
 
@@ -57,6 +57,24 @@ const mazeWidthSelect = document.getElementById('mazeWidthSelect');
 const mazeHeightSelect = document.getElementById('mazeHeightSelect');
 const startButton = document.getElementById('startButton');
 
+// --- 추가된 DOM 요소 (멀티플레이) ---
+const gameModeContainer = document.getElementById('gameModeContainer');
+const singlePlayerBtn = document.getElementById('singlePlayerBtn');
+const multiplayerBtn = document.getElementById('multiplayerBtn');
+const singlePlayerContainer = document.getElementById('singlePlayerContainer');
+const multiplayerChoiceContainer = document.getElementById('multiplayerChoiceContainer');
+const createNewGameBtn = document.getElementById('createNewGameBtn');
+const joinGameBtn = document.getElementById('joinGameBtn');
+const lobbyContainer = document.getElementById('lobbyContainer');
+const mazeWidthSelectLobby = document.getElementById('mazeWidthSelectLobby');
+const mazeHeightSelectLobby = document.getElementById('mazeHeightSelectLobby');
+const autoFitButtonLobby = document.getElementById('autoFitButtonLobby');
+const backToMultiplayerChoiceButton = document.getElementById('backToMultiplayerChoiceButton');
+const startLobbyButton = document.getElementById('startLobbyButton');
+const readyButton = document.getElementById('readyButton');
+const backToGameMode = document.getElementById('backToGameMode');
+
+
 // Modals
 const winModal = document.getElementById('winModal');
 const winTimeMessage = document.getElementById('winTimeMessage');
@@ -70,27 +88,6 @@ const screenshotImage = document.getElementById('screenshotImage');
 const closeScreenshotModalButton = document.getElementById('closeScreenshotModalButton');
 const flashOverlay = document.getElementById('flashOverlay');
 
-// --- Lobby UI Elements (NEW) ---
-const landingPageView = document.getElementById('landingPageView');
-const playTogetherBtn = document.getElementById('playTogetherBtn');
-const multiplayerChoiceView = document.getElementById('multiplayerChoiceView');
-const createRoomBtn = document.getElementById('createRoomBtn');
-const joinRoomViewBtn = document.getElementById('joinRoomViewBtn');
-const backToLandingBtn1 = document.getElementById('backToLandingBtn1');
-const joinRoomView = document.getElementById('joinRoomView');
-const roomIdInput = document.getElementById('roomIdInput');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const joinErrorText = document.getElementById('joinErrorText');
-const backToLobbyChoiceBtn = document.getElementById('backToLobbyChoiceBtn');
-const roomIdDisplay = document.getElementById('roomIdDisplay');
-const roomIdText = document.getElementById('roomIdText');
-const lobbyAutoFitButton = document.getElementById('lobbyAutoFitButton');
-const playerLobbyView = document.getElementById('playerLobbyView');
-const playerList = document.getElementById('playerList');
-const gameStartContainer = document.getElementById('gameStartContainer');
-const readyButton = document.getElementById('readyButton');
-
-
 // --- 전역 게임 상태 ---
 let TILE_SIZE = 40;
 let MAZE_WIDTH = 11;
@@ -103,12 +100,12 @@ let endPos = { x: 0, y: 0 };
 let startTime;
 let timerInterval;
 let gameWon = false;
-let eButtonUsed = false;
+let wButtonUsed = false;
 let qButtonUsed = false;
 let playerPath = [];
 const MAX_PLAYER_PATH = 200;
-let eButtonClearInterval = null;
-let eButtonPathColor = '';
+let wButtonClearInterval = null;
+let wButtonPathColor = '';
 let animationFrameId;
 let flagAnimationTime = 0;
 let savedPositions = { '1': null, '2': null };
@@ -118,10 +115,6 @@ let moveSoundTimeout = null;
 // 멀티플레이어 상태
 let socket;
 let otherPlayers = {};
-let gameMode = 'single'; // 'single', 'multi-master', 'multi-guest'
-let roomId = null;
-let isMaster = false;
-let isReady = false;
 
 // Joystick state
 let isJoystickActive = false;
@@ -185,7 +178,6 @@ function initializeCanvasSize() {
 }
 
 function drawMaze(flagYOffset = 0) {
-    if (!maze || maze.length === 0) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const wallColor = '#555555';
     const pathColor = '#FFFFFF';
@@ -197,8 +189,8 @@ function drawMaze(flagYOffset = 0) {
         }
     }
     
-    if (eButtonUsed && playerPath.length > 0) {
-        ctx.fillStyle = eButtonPathColor;
+    if (wButtonUsed && playerPath.length > 0) {
+        ctx.fillStyle = wButtonPathColor;
         playerPath.forEach(p => ctx.fillRect(p.x * TILE_SIZE, p.y * TILE_SIZE, TILE_SIZE, TILE_SIZE));
     }
     
@@ -233,10 +225,9 @@ function drawMaze(flagYOffset = 0) {
     // 다른 플레이어들을 그리는 로직 추가
     ctx.font = `${TILE_SIZE * 4.0}px Arial`;
     for (const id in otherPlayers) {
-        if (id !== socket.id) {
-            const otherPlayer = otherPlayers[id];
-            ctx.fillText('👽', otherPlayer.x * TILE_SIZE + TILE_SIZE / 2, otherPlayer.y * TILE_SIZE + TILE_SIZE / 2);
-        }
+        const otherPlayer = otherPlayers[id];
+        // 다른 플레이어는 다른 이모지나 색상으로 표시
+        ctx.fillText('👽', otherPlayer.x * TILE_SIZE + TILE_SIZE / 2, otherPlayer.y * TILE_SIZE + TILE_SIZE / 2);
     }
 
     // 내 플레이어 그리기 (가장 마지막에 그려야 다른 플레이어 위에 보임)
@@ -263,7 +254,7 @@ function updateTimerDisplay() {
     timerDisplay.textContent = `${mins}분${secs}초${centisecs}`;
 }
 
-function calculateAndSetMaxSize() {
+function calculateMaxMazeSize() {
     const availableScreenWidth = Math.min(600, window.innerWidth);
     const availableScreenHeight = window.innerHeight;
     const layoutWidth = availableScreenWidth;
@@ -272,31 +263,43 @@ function calculateAndSetMaxSize() {
     const headerWidth = layoutWidth - 10;
     const MINIMUM_VIABLE_TILE_SIZE = 3;
     
-    let newWidth = Math.floor(headerWidth / MINIMUM_VIABLE_TILE_SIZE);
-    let newHeight = Math.floor(headerHeight / MINIMUM_VIABLE_TILE_SIZE);
+    let maxWidth = Math.floor(headerWidth / MINIMUM_VIABLE_TILE_SIZE);
+    let maxHeight = Math.floor(headerHeight / MINIMUM_VIABLE_TILE_SIZE);
     
-    newWidth = newWidth - (newWidth % STEP) + 1;
-    newHeight = newHeight - (newHeight % STEP) + 1;
+    maxWidth = maxWidth - (maxWidth % STEP) + 1;
+    maxHeight = maxHeight - (maxHeight % STEP) + 1;
 
-    return { newWidth, newHeight };
+    return { maxWidth, maxHeight };
+}
+
+// '최대 크기' 계산 로직 (수정됨)
+function calculateAndDisplayMaxMazeSize() {
+    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+    autoFitButton.textContent = `최대 크기 (${maxWidth}x${maxHeight})`;
 }
 
 function showStartScreen() {
     clearTimeout(moveSoundTimeout);
-    if (gallopingSound && !gallopingSound.paused) gallopingSound.pause();
-    
+    if (gallopingSound && !gallopingSound.paused) {
+        gallopingSound.pause();
+    }
     startScreenModal.style.display = 'flex';
     mainLayout.style.display = 'none';
     [winModal, helpModal, screenshotModal].forEach(modal => modal.style.display = 'none');
     
-    // Reset to landing page view
-    landingPageView.classList.remove('hidden');
-    multiplayerChoiceView.classList.add('hidden');
-    joinRoomView.classList.add('hidden');
+    // 시작 화면 UI 초기 상태로 리셋
+    gameModeContainer.classList.remove('hidden');
+    singlePlayerContainer.classList.add('hidden');
+    multiplayerChoiceContainer.classList.add('hidden');
+    lobbyContainer.classList.add('hidden');
     customSizeContainer.classList.add('hidden');
+    backToGameMode.classList.add('hidden');
 
-    const { newWidth, newHeight } = calculateAndSetMaxSize();
-    autoFitButton.textContent = `최대 크기 (${newWidth}x${newHeight})`;
+    document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
+    const selectedBtn = document.querySelector(`.control-mode-button[data-mode="${controlMode}"]`);
+    if(selectedBtn) selectedBtn.style.backgroundColor = '#4F46E5';
+
+    calculateAndDisplayMaxMazeSize();
 }
 
 async function takeScreenshot() {
@@ -329,7 +332,6 @@ async function takeScreenshot() {
 // 5. 미로 생성 및 게임 로직 (Maze & Game Logic Module)
 // ===================================================================
 
-// 클라이언트 측 미로 생성 로직 (싱글플레이어용)
 function generateMaze() {
     maze = Array(MAZE_HEIGHT).fill(0).map(() => Array(MAZE_WIDTH).fill(1));
     const metaWidth = Math.floor((MAZE_WIDTH - WALL_SIZE) / STEP);
@@ -479,6 +481,33 @@ function placeStartEnd() {
     playerPath = [{ ...player }];
 }
 
+function findShortestPath() {
+    if (!startPos || !endPos) return -1;
+    const queue = [{ ...startPos, dist: 1 }];
+    const visited = new Set([`${startPos.x},${startPos.y}`]);
+    const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === endPos.x && current.y === endPos.y) return current.dist;
+
+        for (const [dx, dy] of directions) {
+            const wallCheckX = current.x + dx * CENTER_OFFSET;
+            const wallCheckY = current.y + dy * CENTER_OFFSET;
+            
+            if (wallCheckX >= 0 && wallCheckX < MAZE_WIDTH && wallCheckY >= 0 && wallCheckY < MAZE_HEIGHT && maze[wallCheckY][wallCheckX] === 0) {
+                 const nextX = current.x + dx * STEP;
+                 const nextY = current.y + dy * STEP;
+                 if (!visited.has(`${nextX},${nextY}`)) {
+                    visited.add(`${nextX},${nextY}`);
+                    queue.push({ x: nextX, y: nextY, dist: current.dist + 1 });
+                }
+            }
+        }
+    }
+    return -1;
+}
+
 function checkWin() {
     if (player.x === endPos.x && player.y === endPos.y) {
         clearInterval(timerInterval);
@@ -518,7 +547,9 @@ function movePlayer(dx, dy) {
         player.x += dx * STEP;
         player.y += dy * STEP;
 
-        if (gameMode !== 'single') {
+        // 중요: 내 위치가 변경될 때마다 서버로 정보를 전송!
+        if (socket) {
+            console.log("Sending playerMovement to server:", { x: player.x, y: player.y }); // [진단 코드]
             socket.emit('playerMovement', { x: player.x, y: player.y });
         }
 
@@ -548,7 +579,6 @@ function saveOrLoadPosition(key) {
         playSound(spotSaveSound);
     } else if (savedPos) {
         player = { ...savedPos };
-        if (gameMode !== 'single') socket.emit('playerMovement', { x: player.x, y: player.y });
         savedPositions[key] = null;
         checkWin();
         playSound(spotSaveSound);
@@ -565,24 +595,23 @@ function handleQButton() {
     qButton_joystick.disabled = true;
     playSound(spotSaveSound);
     player = { ...startPos };
-    if (gameMode !== 'single') socket.emit('playerMovement', { x: player.x, y: player.y });
     playerPath = [{ ...player }];
 }
 
-function handleEButton() {
-    if (gameWon || eButtonUsed) return;
-    eButtonUsed = true;
-    eButton.disabled = true;
-    eButton_joystick.disabled = true;
+function handleWButton() {
+    if (gameWon || wButtonUsed) return;
+    wButtonUsed = true;
+    wButton.disabled = true;
+    wButton_joystick.disabled = true;
     playSound(pastStepSound);
     
-    if (eButtonClearInterval) clearInterval(eButtonClearInterval);
-    eButtonClearInterval = setInterval(() => {
+    if (wButtonClearInterval) clearInterval(wButtonClearInterval);
+    wButtonClearInterval = setInterval(() => {
         if (playerPath.length > 1) {
             playerPath.shift();
         } else {
-            clearInterval(eButtonClearInterval);
-            eButtonClearInterval = null;
+            clearInterval(wButtonClearInterval);
+            wButtonClearInterval = null;
         }
     }, 500);
 }
@@ -660,146 +689,84 @@ function stopJoystick() {
 // 7. 게임 초기화 및 이벤트 리스너 설정 (Initialization & Listeners)
 // ===================================================================
 
+// 소켓 이벤트 리스너들을 모아둘 함수
 function setupSocketListeners() {
-    socket.on("connect", () => { console.log("서버 연결 성공:", socket.id); });
-    socket.on("connect_error", (err) => { console.error("서버 연결 실패:", err.message); });
-
-    // --- 로비 리스너 ---
-    socket.on('roomCreated', (room) => {
-        roomId = room.id;
-        isMaster = true;
-        gameMode = 'multi-master';
-        updateLobbyUI(room);
-        landingPageView.classList.add('hidden');
-        multiplayerChoiceView.classList.add('hidden');
-        customSizeContainer.classList.remove('hidden');
+    // [진단 코드] 연결 시도 직후 이벤트
+    socket.on("connect", () => {
+        console.log("Successfully connected to the server with ID:", socket.id);
     });
 
-    socket.on('roomUpdate', (room) => {
-        roomId = room.id;
-        updateLobbyUI(room);
-        landingPageView.classList.add('hidden');
-        multiplayerChoiceView.classList.add('hidden');
-        joinRoomView.classList.add('hidden');
-        customSizeContainer.classList.remove('hidden');
-    });
-    
-    socket.on('joinError', (message) => {
-        joinErrorText.textContent = message;
-        joinErrorText.style.display = 'block';
+    // [진단 코드] 연결 실패 이벤트
+    socket.on("connect_error", (err) => {
+        console.error("Connection failed:", err.message);
     });
 
-    socket.on('roomClosed', (message) => {
-        alert(message);
-        showStartScreen();
+    // 서버로부터 현재 접속된 플레이어 목록을 받음
+    socket.on('currentPlayers', (players) => {
+        console.log("Received currentPlayers from server:", players); // [진단 코드]
+        Object.keys(players).forEach((id) => {
+            if (players[id].id !== socket.id) {
+                otherPlayers[id] = players[id];
+            }
+        });
     });
 
-    // --- 인게임 리스너 ---
-    socket.on('gameStarted', ({ settings, mazeData }) => {
-        MAZE_WIDTH = settings.width;
-        MAZE_HEIGHT = settings.height;
-        maze = mazeData.maze;
-        startPos = mazeData.startPos;
-        endPos = mazeData.endPos;
-        initGame(true); // isMultiplayer = true
-    });
-
-    socket.on('playerMoved', (playerInfo) => {
+    // 새로운 플레이어가 접속했다는 정보를 받음
+    socket.on('newPlayer', (playerInfo) => {
+        console.log("A new player has joined:", playerInfo); // [진단 코드]
         otherPlayers[playerInfo.id] = playerInfo;
     });
-    
-    socket.on('disconnect', () => {
-        console.log("서버와 연결이 끊어졌습니다.");
-    });
-}
 
-function updateLobbyUI(room) {
-    // 방 ID 표시
-    roomIdText.textContent = room.id;
-    roomIdDisplay.classList.remove('hidden');
-    playerLobbyView.classList.remove('hidden');
-
-    // 설정 동기화
-    mazeWidthSelect.value = room.settings.width;
-    mazeHeightSelect.value = room.settings.height;
-
-    // 플레이어 목록 업데이트
-    playerList.innerHTML = '';
-    Object.values(room.players).forEach(p => {
-        const playerEl = document.createElement('div');
-        playerEl.classList.add('player-list-item');
-        let text = (p.id === socket.id) ? '나' : `플레이어 ${p.id.substring(0, 4)}`;
-        if (p.id === room.masterId) text += ' (방장)';
-        
-        if (p.isReady) {
-            playerEl.classList.add('ready');
-            text += ' - 준비 완료';
-        } else {
-            playerEl.classList.add('not-ready');
+    // 다른 플레이어가 움직였다는 정보를 받음
+    socket.on('playerMoved', (playerInfo) => {
+        // console.log("Received playerMoved from server:", playerInfo); // [진단 코드] - 너무 자주 찍히므로 일단 주석 처리
+        if (otherPlayers[playerInfo.id]) {
+            otherPlayers[playerInfo.id].x = playerInfo.x;
+            otherPlayers[playerInfo.id].y = playerInfo.y;
         }
-        playerEl.textContent = text;
-        playerList.appendChild(playerEl);
     });
 
-    // 마스터/게스트 UI 제어
-    const amIMaster = room.masterId === socket.id;
-    isMaster = amIMaster;
-    gameMode = amIMaster ? 'multi-master' : 'multi-guest';
-    [mazeWidthSelect, mazeHeightSelect, lobbyAutoFitButton].forEach(el => el.disabled = !amIMaster);
-    
-    // 준비/시작 버튼 제어
-    const allReady = Object.values(room.players).every(p => p.isReady);
-    isReady = room.players[socket.id]?.isReady || false;
-
-    if (amIMaster) {
-        startButton.classList.remove('hidden');
-        readyButton.classList.add('hidden');
-        startButton.disabled = !allReady;
-        startButton.textContent = allReady ? '게임 시작' : '모두 준비 대기 중';
-    } else {
-        startButton.classList.add('hidden');
-        readyButton.classList.remove('hidden');
-        readyButton.textContent = isReady ? '준비 취소' : '준비';
-        readyButton.classList.toggle('is-ready', isReady);
-    }
+    // 플레이어가 나갔다는 정보를 받음
+    socket.on('playerDisconnected', (playerId) => {
+        console.log("A player has disconnected:", playerId); // [진단 코드]
+        delete otherPlayers[playerId];
+    });
 }
 
-
-function initGame(isMultiplayer = false) {
+function initGame() {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     
     clearTimeout(moveSoundTimeout);
     if (gallopingSound) gallopingSound.pause();
 
     gameWon = false;
-    eButtonUsed = false;
+    wButtonUsed = false;
     qButtonUsed = false;
-    if (eButtonClearInterval) clearInterval(eButtonClearInterval);
-    eButtonClearInterval = null;
-    eButtonPathColor = getRandomTransparentColor();
+    if (wButtonClearInterval) clearInterval(wButtonClearInterval);
+    wButtonClearInterval = null;
+    wButtonPathColor = getRandomTransparentColor();
     for (let key in savedPositions) savedPositions[key] = null;
-    otherPlayers = {};
 
     [winModal, helpModal, screenshotModal].forEach(modal => modal.style.display = 'none');
-    [eButton, eButton_joystick, qButton, qButton_joystick].forEach(btn => btn.disabled = false);
+    [wButton, wButton_joystick, qButton, qButton_joystick].forEach(btn => btn.disabled = false);
     clearInterval(timerInterval);
     timerDisplay.textContent = '00분00초00';
     
-    if (!isMultiplayer) {
-        generateMaze();
-        placeStartEnd();
-    }
-    
-    player = { ...startPos };
-    playerPath = [{ ...player }];
-
-    startScreenModal.style.display = 'none';
-    mainLayout.style.display = 'flex';
-    mainLayout.className = `main-layout mode-${controlMode}`;
-
     initializeCanvasSize();
 
-    if (gameMode !== 'single') {
+    let attempts = 0;
+    const maxAttempts = 50;
+    do {
+        generateMaze();
+        placeStartEnd();
+        attempts++;
+        if (attempts > maxAttempts) {
+            console.error("Failed to generate a solvable maze.");
+            break;
+        }
+    } while (findShortestPath() === -1); 
+
+    if (socket) {
         socket.emit('playerMovement', { x: player.x, y: player.y });
     }
 
@@ -822,110 +789,85 @@ function setupEventListeners() {
         if (e.target.classList.contains('age-button')) {
             const size = parseInt(e.target.dataset.size);
             MAZE_WIDTH = size; MAZE_HEIGHT = size;
-            gameMode = 'single';
+            mainLayout.className = `main-layout mode-${controlMode}`;
+            startScreenModal.style.display = 'none';
+            mainLayout.style.display = 'flex';
             initGame();
         }
     });
     customSizeBtn.addEventListener('click', () => {
-        landingPageView.classList.add('hidden');
+        ageButtonsContainer.parentElement.classList.add('hidden');
         customSizeContainer.classList.remove('hidden');
-        playerLobbyView.classList.add('hidden');
-        roomIdDisplay.classList.add('hidden');
-        startButton.classList.remove('hidden');
-        readyButton.classList.add('hidden');
-        [mazeWidthSelect, mazeHeightSelect, lobbyAutoFitButton].forEach(el => el.disabled = false);
     });
     startButton.addEventListener('click', () => {
-        if (gameMode === 'single') {
-            MAZE_WIDTH = parseInt(mazeWidthSelect.value);
-            MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
-            initGame();
-        } else if (isMaster) {
-            socket.emit('startGame', roomId);
-        }
+        MAZE_WIDTH = parseInt(mazeWidthSelect.value);
+        MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
+        initGame();
     });
     backToPresetButton.addEventListener('click', () => {
         customSizeContainer.classList.add('hidden');
-        if (gameMode === 'single') {
-            landingPageView.classList.remove('hidden');
-        } else {
-            // 멀티플레이 로비에서 나가는 로직 추가 필요 (예: 소켓 연결 끊기 후 화면 전환)
-            // 지금은 간단히 첫 화면으로
-            window.location.reload();
-        }
+        ageButtonsContainer.parentElement.classList.remove('hidden');
     });
 
     autoFitButton.addEventListener('click', () => {
-        const { newWidth, newHeight } = calculateAndSetMaxSize();
-        MAZE_WIDTH = newWidth;
-        MAZE_HEIGHT = newHeight;
-        gameMode = 'single';
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        
+        MAZE_WIDTH = maxWidth;
+        MAZE_HEIGHT = maxHeight;
+        
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
         initGame();
     });
-    
-    lobbyAutoFitButton.addEventListener('click', () => {
-        const { newWidth, newHeight } = calculateAndSetMaxSize();
-        mazeWidthSelect.value = newWidth;
-        mazeHeightSelect.value = newHeight;
-        // 변경사항 서버에 알림
-        if (isMaster) {
-            socket.emit('settingsChanged', { roomId, settings: { width: newWidth, height: newHeight } });
-        }
+
+    // --- 멀티플레이 UI 이벤트 리스너 ---
+    singlePlayerBtn.addEventListener('click', () => {
+        gameModeContainer.classList.add('hidden');
+        singlePlayerContainer.classList.remove('hidden');
+        backToGameMode.classList.remove('hidden');
     });
 
-    // --- Multiplayer Lobby Event Listeners ---
-    playTogetherBtn.addEventListener('click', () => {
-        landingPageView.classList.add('hidden');
-        multiplayerChoiceView.classList.remove('hidden');
+    multiplayerBtn.addEventListener('click', () => {
+        gameModeContainer.classList.add('hidden');
+        multiplayerChoiceContainer.classList.remove('hidden');
+        backToGameMode.classList.remove('hidden');
     });
-    backToLandingBtn1.addEventListener('click', () => {
-        multiplayerChoiceView.classList.add('hidden');
-        landingPageView.classList.remove('hidden');
+
+    backToGameMode.addEventListener('click', showStartScreen);
+
+    createNewGameBtn.addEventListener('click', () => {
+        multiplayerChoiceContainer.classList.add('hidden');
+        lobbyContainer.classList.remove('hidden');
     });
-    createRoomBtn.addEventListener('click', () => {
-        const settings = {
-            width: parseInt(mazeWidthSelect.value),
-            height: parseInt(mazeHeightSelect.value)
-        };
-        socket.emit('createRoom', settings);
+
+    backToMultiplayerChoiceButton.addEventListener('click', () => {
+        lobbyContainer.classList.add('hidden');
+        multiplayerChoiceContainer.classList.remove('hidden');
     });
-    joinRoomViewBtn.addEventListener('click', () => {
-        multiplayerChoiceView.classList.add('hidden');
-        joinRoomView.classList.remove('hidden');
-        joinErrorText.style.display = 'none';
+
+    autoFitButtonLobby.addEventListener('click', () => {
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        mazeWidthSelectLobby.value = maxWidth;
+        mazeHeightSelectLobby.value = maxHeight;
     });
-    backToLobbyChoiceBtn.addEventListener('click', () => {
-        joinRoomView.classList.add('hidden');
-        multiplayerChoiceView.classList.remove('hidden');
-    });
-    joinRoomBtn.addEventListener('click', () => {
-        const idToJoin = roomIdInput.value;
-        if (idToJoin && idToJoin.length === 4) {
-            socket.emit('joinRoom', idToJoin);
-        } else {
-            joinErrorText.textContent = '유효한 4자리 방 ID를 입력하세요.';
-            joinErrorText.style.display = 'block';
-        }
-    });
+
     readyButton.addEventListener('click', () => {
-        isReady = !isReady;
-        socket.emit('playerReady', { roomId, isReady });
+        readyButton.textContent = '준비 완료!';
+        readyButton.style.backgroundColor = 'var(--color-blue-pastel)';
+        // 여기에 다른 플레이어에게 준비 상태를 알리는 로직 추가 (socket.emit)
     });
-    [mazeWidthSelect, mazeHeightSelect].forEach(el => {
-        el.addEventListener('change', () => {
-            if (isMaster) {
-                const settings = {
-                    width: parseInt(mazeWidthSelect.value),
-                    height: parseInt(mazeHeightSelect.value)
-                };
-                socket.emit('settingsChanged', { roomId, settings });
-            }
-        });
-    });
-    roomIdText.addEventListener('click', () => {
-        navigator.clipboard.writeText(roomIdText.textContent).then(() => {
-            alert('방 ID가 복사되었습니다!');
-        });
+
+    startLobbyButton.addEventListener('click', () => {
+        MAZE_WIDTH = parseInt(mazeWidthSelectLobby.value);
+        MAZE_HEIGHT = parseInt(mazeHeightSelectLobby.value);
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
+        initGame();
     });
 
 
@@ -936,9 +878,9 @@ function setupEventListeners() {
 
         if (['1', '2'].includes(key)) return saveOrLoadPosition(key);
         if (key === 'q') return handleQButton();
-        if (key === 'w') return handleEButton();
+        if (key === 'w') return handleWButton();
 
-        switch (e.key) {
+        switch (e.key) { // Use e.key to capture "Arrow..."
             case 'ArrowUp': movePlayer(0, -1); break;
             case 'ArrowDown': movePlayer(0, 1); break;
             case 'ArrowLeft': movePlayer(-1, 0); break;
@@ -963,28 +905,15 @@ function setupEventListeners() {
     document.addEventListener('touchend', stopJoystick);
 
     [qButton, qButton_joystick].forEach(btn => btn.addEventListener('click', handleQButton));
-    [eButton, eButton_joystick].forEach(btn => btn.addEventListener('click', handleEButton));
+    [wButton, wButton_joystick].forEach(btn => btn.addEventListener('click', handleWButton));
     for (const key in rollbackButtons) {
         rollbackButtons[key].forEach(btn => {
             if (btn) btn.addEventListener('click', () => saveOrLoadPosition(key));
         });
     }
     
-    restartButton.addEventListener('click', () => {
-        if (gameMode === 'single') {
-            initGame();
-        } else {
-            alert('멀티플레이 중에는 재시작할 수 없습니다. 새로 방을 만들어주세요.');
-        }
-    });
-    winRestartButton.addEventListener('click', () => {
-        if (gameMode === 'single') {
-            winModal.style.display = 'none';
-            initGame();
-        } else {
-            showStartScreen();
-        }
-    });
+    restartButton.addEventListener('click', initGame);
+    winRestartButton.addEventListener('click', () => { winModal.style.display = 'none'; initGame(); });
     winHomeButton.addEventListener('click', showStartScreen);
     resetSizeButton.addEventListener('click', showStartScreen);
     helpButton.addEventListener('click', () => { helpModal.style.display = 'flex'; });
@@ -996,11 +925,14 @@ function setupEventListeners() {
         isSoundOn = !isSoundOn;
         soundToggleButton.textContent = isSoundOn ? '🔊' : '🔇';
         
+        // Mute all HTML audio elements
         const allHtmlAudio = [gallopingSound, spotSaveSound, spotLoadSound, pastStepSound, clearSound];
         allHtmlAudio.forEach(audio => audio.muted = !isSoundOn);
         
+        // Mute Tone.js library
         if(audioContextResumed) Tone.Destination.mute = !isSoundOn;
 
+        // If turning sound off, immediately stop any playing sounds
         if (!isSoundOn && gallopingSound && !gallopingSound.paused) {
             gallopingSound.pause();
         }
@@ -1010,8 +942,7 @@ function setupEventListeners() {
         if (mainLayout.style.display === 'flex') { 
             initializeCanvasSize(); 
         } else if (startScreenModal.style.display === 'flex') {
-            const { newWidth, newHeight } = calculateAndSetMaxSize();
-            autoFitButton.textContent = `최대 크기 (${newWidth}x${newHeight})`;
+            calculateAndDisplayMaxMazeSize();
         }
     });
 }
@@ -1032,6 +963,22 @@ function populateSizeDropdowns() {
     });
 }
 
+function populateLobbySizeDropdowns() {
+    mazeWidthSelectLobby.innerHTML = '';
+    mazeHeightSelectLobby.innerHTML = '';
+
+    const widthSizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109];
+    const heightSizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
+
+    widthSizes.forEach(size => {
+        mazeWidthSelectLobby.add(new Option(size, size));
+    });
+
+    heightSizes.forEach(size => {
+        mazeHeightSelectLobby.add(new Option(size, size));
+    });
+}
+
 // --- App Entry Point ---
 document.addEventListener('DOMContentLoaded', () => {
     if (!CanvasRenderingContext2D.prototype.roundRect) {
@@ -1049,14 +996,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     populateSizeDropdowns();
+    populateLobbySizeDropdowns(); // 로비 드롭다운 채우기
     setupEventListeners();
     initAudio();
     showStartScreen();
 
+    // 서버에 접속하는 로직 추가
     try {
+        console.log("서버에 접속 시도 중... 주소:", "https://miromulti.onrender.com"); // [진단 코드]
         socket = io("https://miromulti.onrender.com"); 
-        setupSocketListeners();
+        setupSocketListeners(); // 소켓 이벤트 리스너 설정 함수 호출
     } catch (e) {
-        console.error("서버 연결 시도 중 즉시 에러 발생:", e);
+        console.error("서버 연결 시도 중 즉시 에러 발생:", e); // [진단 코드]
     }
 });
