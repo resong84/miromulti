@@ -526,6 +526,7 @@ function movePlayer(dx, dy) {
 
         // 중요: 내 위치가 변경될 때마다 서버로 정보를 전송!
         if (socket) {
+            console.log("Sending playerMovement to server:", { x: player.x, y: player.y }); // [진단 코드]
             socket.emit('playerMovement', { x: player.x, y: player.y });
         }
 
@@ -667,8 +668,19 @@ function stopJoystick() {
 
 // 소켓 이벤트 리스너들을 모아둘 함수
 function setupSocketListeners() {
+    // [진단 코드] 연결 시도 직후 이벤트
+    socket.on("connect", () => {
+        console.log("Successfully connected to the server with ID:", socket.id);
+    });
+
+    // [진단 코드] 연결 실패 이벤트
+    socket.on("connect_error", (err) => {
+        console.error("Connection failed:", err.message);
+    });
+
     // 서버로부터 현재 접속된 플레이어 목록을 받음
     socket.on('currentPlayers', (players) => {
+        console.log("Received currentPlayers from server:", players); // [진단 코드]
         Object.keys(players).forEach((id) => {
             if (players[id].id !== socket.id) {
                 otherPlayers[id] = players[id];
@@ -678,11 +690,13 @@ function setupSocketListeners() {
 
     // 새로운 플레이어가 접속했다는 정보를 받음
     socket.on('newPlayer', (playerInfo) => {
+        console.log("A new player has joined:", playerInfo); // [진단 코드]
         otherPlayers[playerInfo.id] = playerInfo;
     });
 
     // 다른 플레이어가 움직였다는 정보를 받음
     socket.on('playerMoved', (playerInfo) => {
+        // console.log("Received playerMoved from server:", playerInfo); // [진단 코드] - 너무 자주 찍히므로 일단 주석 처리
         if (otherPlayers[playerInfo.id]) {
             otherPlayers[playerInfo.id].x = playerInfo.x;
             otherPlayers[playerInfo.id].y = playerInfo.y;
@@ -691,6 +705,7 @@ function setupSocketListeners() {
 
     // 플레이어가 나갔다는 정보를 받음
     socket.on('playerDisconnected', (playerId) => {
+        console.log("A player has disconnected:", playerId); // [진단 코드]
         delete otherPlayers[playerId];
     });
 }
@@ -908,11 +923,11 @@ document.addEventListener('DOMContentLoaded', () => {
     showStartScreen();
 
     // 서버에 접속하는 로직 추가
-    // "YOUR_SERVER_URL"은 Render 등에서 제공하는 실제 서버 주소로 변경해야 합니다.
     try {
+        console.log("서버에 접속 시도 중... 주소:", "https://miromulti.onrender.com"); // [진단 코드]
         socket = io("https://miromulti.onrender.com"); 
         setupSocketListeners(); // 소켓 이벤트 리스너 설정 함수 호출
     } catch (e) {
-        console.error("서버에 연결할 수 없습니다.", e);
+        console.error("서버 연결 시도 중 즉시 에러 발생:", e); // [진단 코드]
     }
 });
