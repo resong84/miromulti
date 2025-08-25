@@ -22,7 +22,6 @@
         <div class="start-screen-content">
             <h2>미로 찾기 게임</h2>
             
-            <!-- 1. 게임 방식 선택 -->
             <div id="gameModeContainer" class="maze-size-input-group">
                 <label>게임 방식:</label>
                 <div class="flex gap-2 justify-center">
@@ -31,7 +30,6 @@
                 </div>
             </div>
 
-            <!-- 혼자하기 컨테이너 -->
             <div id="singlePlayerContainer" class="hidden">
                 <div class="maze-size-input-group">
                     <label>조작 방식 선택:</label>
@@ -40,23 +38,22 @@
                         <button class="action-button control-mode-button" data-mode="joystick" aria-label="조이스틱 조작 방식 선택">조이스틱 방식</button>
                     </div>
                 </div>
-
                 <div class="maze-size-input-group">
                     <label>미로 크기 선택:</label>
                     <div id="ageButtonsContainer" class="flex gap-2 flex-wrap justify-center">
-                        <button class="action-button age-button" data-size="43" aria-label="5세용 43x43 크기 선택">5세: 43 x 43</button>
-                        <button class="action-button age-button" data-size="55" aria-label="6세용 55x55 크기 선택">6세: 55 x 55</button>
-                        <button class="action-button age-button" data-size="67" aria-label="7세용 67x67 크기 선택">7세: 67 x 67</button>
-                        <button id="customSizeBtn" class="action-button" aria-label="미로 크기 직접 설정하기">직접 설정</button>
-                        <button id="autoFitButton" class="action-button" style="background-color: #A7C7E7;" aria-label="현재 화면에 맞는 최대 크기로 시작">최대 크기</button>
+                        <button class="action-button age-button" data-size="43">5세: 43 x 43</button>
+                        <button class="action-button age-button" data-size="55">6세: 55 x 55</button>
+                        <button class="action-button age-button" data-size="67">7세: 67 x 67</button>
+                        <button id="customSizeBtn" class="action-button">직접 설정</button>
+                        <button id="autoFitButton" class="action-button" style="background-color: #A7C7E7;">최대 크기</button>
                     </div>
                 </div>
                 <div id="customSizeContainer" class="maze-size-input-group hidden">
                     <label for="mazeWidthSelect">직접 설정 (가로 x 세로):</label>
                     <div class="maze-size-input">
-                        <select id="mazeWidthSelect" aria-label="미로 가로 크기 선택"></select>
+                        <select id="mazeWidthSelect"></select>
                         <span>x</span>
-                        <select id="mazeHeightSelect" aria-label="미로 세로 크기 선택"></select>
+                        <select id="mazeHeightSelect"></select>
                     </div>
                     <p class="size-limit-text">크기를 선택해주세요.</p>
                     <div class="flex gap-2 mt-2">
@@ -66,7 +63,6 @@
                 </div>
             </div>
 
-            <!-- 2. 함께하기 선택 -->
             <div id="multiplayerChoiceContainer" class="maze-size-input-group hidden">
                 <label>함께하기:</label>
                 <div class="flex gap-2 justify-center">
@@ -75,20 +71,17 @@
                 </div>
             </div>
 
-            <!-- 3. 로비 (새로운 게임 만들기) -->
             <div id="lobbyContainer" class="maze-size-input-group hidden">
-                <!-- 방 ID 표시 및 복사 -->
-                <div id="roomInfoContainer" class="hidden mt-2 text-center" style="margin-bottom: 10px;">
-                    <p class="text-sm text-gray-600">방 ID: <strong id="roomIdDisplay"></strong></p>
-                    <button id="copyRoomIdBtn" class="action-button" style="font-size: 0.8rem; padding: 4px 8px; margin-top: 4px;">ID 복사</button>
+                <div id="roomInfoContainer" class="hidden items-center justify-center gap-2 mb-3">
+                    <span class="text-sm text-gray-600">방 ID: <strong id="roomIdDisplay" class="text-lg"></strong></span>
+                    <button id="copyRoomIdBtn" class="action-button" style="font-size: 0.8rem; padding: 4px 8px;">복사</button>
                 </div>
-
                 <label for="mazeWidthSelectLobby">로비 (가로 x 세로):</label>
                 <div class="maze-size-input">
-                    <select id="mazeWidthSelectLobby" aria-label="미로 가로 크기 선택"></select>
+                    <select id="mazeWidthSelectLobby"></select>
                     <span>x</span>
-                    <select id="mazeHeightSelectLobby" aria-label="미로 세로 크기 선택"></select>
-                    <button id="autoFitButtonLobby" class="action-button" style="background-color: #A7C7E7; margin-left: 5px; padding: 8px 12px; font-size: 0.9rem;" aria-label="현재 화면에 맞는 최대 크기로 설정">최대</button>
+                    <select id="mazeHeightSelectLobby"></select>
+                    <button id="autoFitButtonLobby" class="action-button" style="background-color: #A7C7E7; margin-left: 5px; padding: 8px 12px; font-size: 0.9rem;">최대</button>
                 </div>
                 <p class="size-limit-text">크기를 선택해주세요.</p>
                 <div class="flex gap-2 mt-2">
@@ -100,9 +93,18 @@
                 </div>
             </div>
 
-            <!-- 모든 화면에서 게임 방식 선택으로 돌아가는 버튼 -->
             <button id="backToGameMode" class="action-button reset-size-button mt-4 hidden">게임 방식 선택</button>
+        </div>
+    </div>
 
+    <!-- 방 목록 모달 (새로 추가) -->
+    <div id="roomListModal" class="help-modal"> <!-- 기존 help-modal 스타일 재사용 -->
+        <div class="help-modal-content">
+            <h2 class="help-message-title">참여 가능한 방 목록</h2>
+            <div id="roomListContainer" class="w-full mt-4 flex flex-col gap-2" style="max-height: 300px; overflow-y: auto;">
+                <!-- 방 목록이 여기에 동적으로 추가됩니다. -->
+            </div>
+            <button id="closeRoomListModalButton" class="action-button mt-4">닫기</button>
         </div>
     </div>
 
@@ -110,7 +112,6 @@
         <header class="game-header">
             <canvas id="mazeCanvas"></canvas>
         </header>
-
         <footer class="game-footer">
             <div class="game-info-container">
                 <button id="resetSizeButton" class="action-button reset-size-button">크기 설정</button>
@@ -119,75 +120,46 @@
                 <button id="soundToggleButton" class="action-button" aria-label="소리 켜기/끄기">🔊</button>
                 <button id="helpButton" class="help-button" aria-label="도움말 보기">?</button>
             </div>
-
             <div class="message-box" id="messageBox"></div>
-
             <div class="controls-wrapper">
-                <!-- Keyboard Controls UI -->
                 <div class="keyboard-controls">
                     <div class="main-controls-row">
                         <div class="left-control-stack">
-                            <div class="rollback-group" role="group" aria-label="위치 저장/이동 그룹">
-                                <button id="rollback1_left" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
-                                    <span class="rollback-num">1</span>
-                                    <span class="rollback-desc">위치저장</span>
-                                </button>
-                                <button id="rollback2_left" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
-                                    <span class="rollback-num">2</span>
-                                    <span class="rollback-desc">위치저장</span>
-                                </button>
+                            <div class="rollback-group" role="group">
+                                <button id="rollback1_left" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
+                                <button id="rollback2_left" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
                             </div>
                             <div class="text-actions-row">
-                                <button id="qButton" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
-                                    <span class="key-char">Q</span>
-                                    <span class="key-desc">시작위치</span>
-                                </button>
-                                <button id="wButton" class="multi-line-action-button" aria-label="지나온 동선 표시">
-                                    <span class="key-char">W</span>
-                                    <span class="key-desc">동선</span>
-                                </button>
+                                <button id="qButton" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
+                                <button id="wButton" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
                             </div>
                         </div>
-                        <div class="directional-controls" role="group" aria-label="방향키">
+                        <div class="directional-controls" role="group">
                             <div class="directional-row top-row">
                                 <div class="placeholder-button"></div>
-                                <button id="up" class="game-button-base arrow-button" aria-label="위로 이동">⬆️</button>
+                                <button id="up" class="game-button-base arrow-button">⬆️</button>
                                 <div class="placeholder-button"></div>
                             </div>
                             <div class="directional-row middle-row">
-                                <button id="left" class="game-button-base arrow-button" aria-label="왼쪽으로 이동">⬅️</button>
-                                <button id="down" class="game-button-base arrow-button" aria-label="아래로 이동">⬇️</button>
-                                <button id="right" class="game-button-base arrow-button" aria-label="오른쪽으로 이동">➡️</button>
+                                <button id="left" class="game-button-base arrow-button">⬅️</button>
+                                <button id="down" class="game-button-base arrow-button">⬇️</button>
+                                <button id="right" class="game-button-base arrow-button">➡️</button>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Joystick Controls UI -->
                 <div class="joystick-controls">
                     <div class="left-control-stack">
-                        <div class="rollback-group" role="group" aria-label="조이스틱 위치 저장/이동 그룹">
-                            <button id="rollback1_joystick" class="rollback-button red" aria-label="위치 1 저장 또는 이동">
-                                <span class="rollback-num">1</span>
-                                <span class="rollback-desc">위치저장</span>
-                            </button>
-                            <button id="rollback2_joystick" class="rollback-button blue" aria-label="위치 2 저장 또는 이동">
-                                <span class="rollback-num">2</span>
-                                <span class="rollback-desc">위치저장</span>
-                            </button>
+                        <div class="rollback-group" role="group">
+                            <button id="rollback1_joystick" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
+                            <button id="rollback2_joystick" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
                         </div>
                         <div class="text-actions-row">
-                            <button id="qButton_joystick" class="multi-line-action-button" aria-label="시작 위치로 돌아가기">
-                                <span class="key-char">Q</span>
-                                <span class="key-desc">시작위치</span>
-                            </button>
-                            <button id="wButton_joystick" class="multi-line-action-button" aria-label="지나온 동선 표시">
-                                <span class="key-char">W</span>
-                                <span class="key-desc">동선</span>
-                            </button>
+                            <button id="qButton_joystick" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
+                            <button id="wButton_joystick" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
                         </div>
                     </div>
-                    <div id="joystickBase" class="joystick-base" role="button" aria-label="조이스틱 컨트롤러">
+                    <div id="joystickBase" class="joystick-base" role="button">
                         <div id="joystickKnob" class="joystick-knob"></div>
                     </div>
                 </div>
@@ -195,7 +167,7 @@
         </footer>
     </div>
 
-    <!-- Modals -->
+    <!-- Other Modals -->
     <div id="winModal" class="win-modal">
         <div class="win-modal-content">
             <p class="win-message-line">축하합니다!</p>
@@ -205,7 +177,7 @@
             <div class="win-modal-buttons">
                 <button id="winHomeButton" class="action-button">처음으로</button>
                 <button id="winRestartButton" class="action-button">다시 시작</button>
-                <button id="shareButton" class="action-button" aria-label="게임 결과 공유하기">공유</button>
+                <button id="shareButton" class="action-button">공유</button>
             </div>
         </div>
     </div>
@@ -244,7 +216,6 @@
     <audio id="pastStepSound" src="paststep.mp3"></audio>
     <audio id="clearSound" src="clear.mp3"></audio>
 
-    <!-- External JavaScript -->
     <script src="script.js"></script>
 </body>
 </html>

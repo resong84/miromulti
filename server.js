@@ -33,6 +33,15 @@ const updateLobbyState = (roomId) => {
     }
 };
 
+// 모든 클라이언트에게 현재 방 목록을 브로드캐스트하는 함수
+const broadcastRoomList = () => {
+    const roomList = Object.values(rooms).map(room => ({
+        id: room.id,
+        playerCount: Object.keys(room.players).length
+    }));
+    io.emit('roomListUpdate', roomList);
+};
+
 io.on('connection', (socket) => {
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
 
@@ -41,23 +50,21 @@ io.on('connection', (socket) => {
   socket.broadcast.emit('newPlayer', players[socket.id]);
 
   socket.on('createGame', (settings) => {
-    const roomId = uuidv4().substring(0, 6); // 더 짧은 ID로 변경
+    const roomId = uuidv4().substring(0, 6);
     socket.join(roomId);
     playerRooms[socket.id] = roomId;
 
     rooms[roomId] = {
         id: roomId,
-        players: {
-            [socket.id]: { id: socket.id, isReady: false, isMaster: true }
-        },
+        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true } },
         settings: { width: settings.width, height: settings.height }
     };
     console.log(`[진단] 방 생성됨: ${roomId}, Master: ${socket.id}`);
     socket.emit('roomCreated', { roomId });
     updateLobbyState(roomId);
+    broadcastRoomList(); // 새 방이 생겼으므로 목록 전체 전파
   });
 
-  // 게임 참여 로직 추가
   socket.on('joinGame', ({ roomId }) => {
     if (rooms[roomId]) {
         socket.join(roomId);
@@ -66,17 +73,26 @@ io.on('connection', (socket) => {
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
         socket.emit('joinSuccess');
-        updateLobbyState(roomId); // 새로운 플레이어가 참여했음을 모두에게 알림
+        updateLobbyState(roomId);
+        broadcastRoomList(); // 플레이어 수가 변경되었으므로 목록 전체 전파
     } else {
-        socket.emit('joinError', { message: '해당 방을 찾을 수 없습니다. ID를 다시 확인해주세요.' });
+        socket.emit('joinError', { message: '해당 방을 찾을 수 없습니다.' });
     }
+  });
+
+  // 클라이언트가 방 목록을 요청할 때 현재 목록을 보내주는 핸들러
+  socket.on('requestRoomList', () => {
+    const roomList = Object.values(rooms).map(room => ({
+        id: room.id,
+        playerCount: Object.keys(room.players).length
+    }));
+    socket.emit('roomListUpdate', roomList);
   });
 
   socket.on('playerReady', ({ isReady }) => {
     const roomId = playerRooms[socket.id];
     if (rooms[roomId] && rooms[roomId].players[socket.id]) {
         rooms[roomId].players[socket.id].isReady = isReady;
-        console.log(`[진단] ${socket.id} 준비 상태 변경: ${isReady}`);
         updateLobbyState(roomId);
     }
   });
@@ -86,10 +102,7 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (room && room.players[socket.id] && room.players[socket.id].isMaster) {
         room.settings = newSettings;
-        Object.values(room.players).forEach(player => {
-            player.isReady = false;
-        });
-        console.log(`[진단] ${roomId} 방 설정 변경됨. 모든 플레이어 준비 취소.`);
+        Object.values(room.players).forEach(player => { player.isReady = false; });
         io.to(roomId).emit('unReadyAllPlayers');
         updateLobbyState(roomId);
     }
@@ -99,11 +112,10 @@ io.on('connection', (socket) => {
     const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     if (room && room.players[socket.id] && room.players[socket.id].isMaster) {
-        const allReady = Object.values(room.players).every(p => p.isReady);
-        if (allReady) {
-            console.log(`[진단] ${roomId} 방 게임 시작!`);
+        if (Object.values(room.players).every(p => p.isReady)) {
             io.to(roomId).emit('gameStarting', room.settings);
             delete rooms[roomId];
+            broadcastRoomList(); // 게임이 시작되어 방이 사라졌으므로 목록 전체 전파
         }
     }
   });
@@ -126,6 +138,7 @@ io.on('connection', (socket) => {
         } else {
             updateLobbyState(roomId);
         }
+        broadcastRoomList(); // 플레이어가 나가서 방이 사라지거나 인원이 변경됐으므로 목록 전파
     }
     delete players[socket.id];
     delete playerRooms[socket.id];
