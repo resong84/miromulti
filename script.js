@@ -354,14 +354,12 @@ function updateLobbyUI(isMaster) {
     }
     
     if (isMaster) {
-        // 방장의 '준비' 버튼은 lobbyStateUpdate에서 관리하므로 여기서는 초기 상태만 설정
         readyButton.style.display = 'flex';
-        startLobbyButton.style.visibility = 'hidden';
+        startLobbyButton.style.display = 'none'; // 시작 버튼은 초기에 숨김
         roomInfoContainer.style.display = 'flex';
     } else { 
-        // 게스트는 항상 '준비' 버튼만 보임
         readyButton.style.display = 'flex';
-        startLobbyButton.style.display = 'none';
+        startLobbyButton.style.display = 'none'; // 게스트는 시작 버튼을 볼 수 없음
         roomInfoContainer.style.display = 'flex';
     }
 }
@@ -791,11 +789,11 @@ function setupSocketListeners() {
             mazeHeightSelectLobby.value = lobbyState.settings.height;
         }
         
-        // [중요] '준비/시작' 버튼 상태는 서버가 보내준 최신 정보로만 결정
         const allPlayersReady = Object.values(lobbyState.players).every(p => p.isReady);
+        
         if (playerRole === 'master') {
-            startLobbyButton.style.visibility = allPlayersReady ? 'visible' : 'hidden';
-            readyButton.style.display = allPlayersReady ? 'none' : 'flex';
+            readyButton.style.display = 'flex';
+            startLobbyButton.style.display = allPlayersReady ? 'flex' : 'none';
         }
     });
     

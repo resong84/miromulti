@@ -528,6 +528,10 @@ canvas {
     transform: translateY(0);
     box-shadow: 0 2px 5px var(--color-shadow);
 }
+#readyButton {
+    font-size: 1.1rem;
+    background-color: var(--color-green-pastel);
+}
 .start-screen-error {
     color: var(--color-error); font-size: 0.9rem;
     margin-top: -10px; display: none;
