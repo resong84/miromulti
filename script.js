@@ -354,10 +354,12 @@ function updateLobbyUI(isMaster) {
     }
     
     if (isMaster) {
+        // 방장의 '준비' 버튼은 lobbyStateUpdate에서 관리하므로 여기서는 초기 상태만 설정
         readyButton.style.display = 'flex';
         startLobbyButton.style.visibility = 'hidden';
         roomInfoContainer.style.display = 'flex';
     } else { 
+        // 게스트는 항상 '준비' 버튼만 보임
         readyButton.style.display = 'flex';
         startLobbyButton.style.display = 'none';
         roomInfoContainer.style.display = 'flex';
@@ -751,7 +753,6 @@ function setupSocketListeners() {
         lobbyContainer.classList.remove('hidden');
         playerRole = 'guest';
 
-        // 방장이 설정한 내용으로 UI 업데이트
         setLobbySizeMode(room.settings.mode);
         levelSelectLobby.value = room.settings.preset;
         mazeWidthSelectLobby.value = room.settings.width;
@@ -789,6 +790,8 @@ function setupSocketListeners() {
             mazeWidthSelectLobby.value = lobbyState.settings.width;
             mazeHeightSelectLobby.value = lobbyState.settings.height;
         }
+        
+        // [중요] '준비/시작' 버튼 상태는 서버가 보내준 최신 정보로만 결정
         const allPlayersReady = Object.values(lobbyState.players).every(p => p.isReady);
         if (playerRole === 'master') {
             startLobbyButton.style.visibility = allPlayersReady ? 'visible' : 'hidden';
@@ -905,7 +908,7 @@ function startGameplay() {
     for (let key in savedPositions) savedPositions[key] = null;
 
     [winModal, helpModal, screenshotModal].forEach(modal => {
-        if(modal.id !== 'winModal' || !socket) { // 멀티플레이 시 대기 화면이 떠있을 수 있으므로 winModal은 닫지 않음
+        if(modal.id !== 'winModal' || !socket) {
             modal.style.display = 'none';
         }
     });
