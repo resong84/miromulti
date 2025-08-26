@@ -131,7 +131,12 @@ canvas {
 /* =================================================================== */
 .main-layout.mode-keyboard .joystick-controls { display: none; }
 .main-layout.mode-joystick .keyboard-controls { display: none; }
-.keyboard-controls, .joystick-controls { width: 100%; }
+.keyboard-controls, .joystick-controls { 
+    width: 100%; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
 /* --- Keyboard Controls --- */
 .main-controls-row {
@@ -141,6 +146,15 @@ canvas {
     width: 100%;
     margin: 0 auto;
     gap: 15px;
+}
+.right-control-stack {
+    width: 170px;
+    height: 114px; /* Height of directional controls */
+    display: grid;
+    place-items: center;
+}
+.right-control-stack > div {
+    grid-area: 1 / 1;
 }
 .directional-controls {
     display: flex;
@@ -166,14 +180,6 @@ canvas {
 .directional-row.middle-row { justify-content: center; }
 
 /* --- Joystick Controls --- */
-.joystick-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 40px;
-    padding: 0 20px;
-    box-sizing: border-box;
-}
 .joystick-base {
     width: 80px;
     height: 80px;
@@ -236,8 +242,8 @@ canvas {
 
 /* Specific button styles */
 .arrow-button {
-    width: 52px; /* 수정됨 */
-    height: 52px; /* 수정됨 */
+    width: 52px;
+    height: 52px;
     font-size: 1.8rem;
 }
 
@@ -258,15 +264,15 @@ canvas {
     color: var(--color-text-inverted);
     cursor: pointer;
     display: flex;
-    flex-direction: column; /* 수정됨 */
-    justify-content: center; /* 수정됨 */
-    align-items: center; /* 수정됨 */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     transition: background-color 0.2s ease, transform 0.1s ease;
     box-shadow: 0 2px 4px var(--color-shadow);
     border: none;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    line-height: 1.1; /* 수정됨 */
-    padding: 4px 0; /* 수정됨 */
+    line-height: 1.1;
+    padding: 4px 0;
 }
 .rollback-button:hover { transform: scale(1.05); }
 .rollback-button:active { transform: scale(0.95); }
@@ -283,21 +289,30 @@ canvas {
     margin-top: 0;
     flex-wrap: wrap; 
 }
-.timer-display {
+.game-info-container .timer-display {
+    font-size: 1.1rem;
+    padding: 6px 12px;
+}
+.game-info-container .action-button,
+.game-info-container .help-button {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+}
+.game-info-container .reset-size-button {
     font-size: 1.2rem;
+}
+
+.timer-display {
     font-weight: bold;
     color: var(--color-text-primary);
     background-color: var(--color-bg-light);
-    padding: 8px 16px;
     border-radius: var(--radius-small);
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
 .action-button {
     background-color: var(--color-green-pastel);
     color: var(--color-text-inverted);
-    padding: 8px 16px;
     border-radius: var(--radius-medium);
-    font-size: 1.0rem;
     font-weight: bold;
     cursor: pointer;
     transition: background-color 0.2s ease, transform 0.1s ease;
@@ -327,9 +342,7 @@ canvas {
 .help-button {
     background-color: var(--color-blue-pastel);
     color: var(--color-text-inverted);
-    padding: 8px 12px;
     border-radius: var(--radius-medium);
-    font-size: 1.1rem;
     font-weight: bold;
     cursor: pointer;
     transition: background-color 0.2s ease, transform 0.1s ease;
@@ -391,11 +404,11 @@ canvas {
     font-size: 0.7rem;
     font-weight: normal;
 }
-.rollback-num { /* 추가됨 */
+.rollback-num {
     font-size: 1.2rem;
     font-weight: bold;
 }
-.rollback-desc { /* 추가됨 */
+.rollback-desc {
     font-size: 0.7rem;
     font-weight: normal;
 }
@@ -422,6 +435,30 @@ canvas {
     text-align: center;
     max-width: 400px; width: 90%;
     display: flex; flex-direction: column; gap: 20px;
+    position: relative;
+}
+.home-button {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background-color: var(--color-bg-light);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: none; /* Initially hidden */
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.home-button:hover {
+    background-color: #dddddd;
+    transform: scale(1.1);
+}
+.home-button:active {
+    transform: scale(1.0);
 }
 .start-screen-content h2 {
     font-size: 2rem; font-weight: bold;
@@ -438,11 +475,19 @@ canvas {
     display: flex; gap: 10px;
     justify-content: center; align-items: center;
 }
-.maze-size-input input, .maze-size-input select {
-    width: 80px; padding: 8px 12px;
-    border: 2px solid #ccc; border-radius: var(--radius-small);
-    font-size: 1rem; text-align: center;
+.maze-size-input input, .maze-size-input select, select.maze-size-input {
+    width: auto;
+    padding: 8px 12px;
+    border: 2px solid #ccc;
+    border-radius: var(--radius-small);
+    font-size: 1rem;
+    text-align: center;
     -moz-appearance: textfield;
+}
+#levelSelect {
+    min-width: 200px;
+    text-align: left;
+    padding-left: 15px;
 }
 .maze-size-input input::-webkit-outer-spin-button,
 .maze-size-input input::-webkit-inner-spin-button {

@@ -31,15 +31,14 @@ const helpButton = document.getElementById('helpButton');
 const randomSizeButton = document.getElementById('randomSizeButton');
 const qButton = document.getElementById('qButton');
 const wButton = document.getElementById('wButton');
-const qButton_joystick = document.getElementById('qButton_joystick');
-const wButton_joystick = document.getElementById('wButton_joystick');
 const backToPresetButton = document.getElementById('backToPresetButton');
 const soundToggleButton = document.getElementById('soundToggleButton');
+const homeButton = document.getElementById('homeButton');
 
 // Rollback Buttons
 const rollbackButtons = {
-    '1': [document.getElementById('rollback1_left'), document.getElementById('rollback1_joystick')],
-    '2': [document.getElementById('rollback2_left'), document.getElementById('rollback2_joystick')],
+    '1': document.getElementById('rollback1'),
+    '2': document.getElementById('rollback2'),
 };
 
 // Joystick
@@ -50,7 +49,8 @@ const joystickKnob = document.getElementById('joystickKnob');
 const startScreenModal = document.getElementById('startScreenModal');
 const controlModeContainer = document.getElementById('controlModeContainer');
 const controlModeContainerLobby = document.getElementById('controlModeContainerLobby');
-const ageButtonsContainer = document.getElementById('ageButtonsContainer');
+const levelSelect = document.getElementById('levelSelect');
+const startPresetButton = document.getElementById('startPresetButton');
 const customSizeBtn = document.getElementById('customSizeBtn');
 const customSizeContainer = document.getElementById('customSizeContainer');
 const mazeWidthSelect = document.getElementById('mazeWidthSelect');
@@ -79,7 +79,6 @@ const randomSizeButtonLobby = document.getElementById('randomSizeButtonLobby');
 const backToMultiplayerChoiceButton = document.getElementById('backToMultiplayerChoiceButton');
 const startLobbyButton = document.getElementById('startLobbyButton');
 const readyButton = document.getElementById('readyButton');
-const backToGameMode = document.getElementById('backToGameMode');
 const roomListModal = document.getElementById('roomListModal');
 const roomListContainer = document.getElementById('roomListContainer');
 const closeRoomListModalButton = document.getElementById('closeRoomListModalButton');
@@ -269,17 +268,25 @@ function calculateMaxMazeSize() {
     const availableScreenHeight = window.innerHeight;
     const layoutWidth = availableScreenWidth;
     const layoutHeight = availableScreenHeight - 40;
-    const bodyHeight = layoutHeight * 0.75 - 10 - 60; // Adjusted for new header
-    const bodyWidth = layoutWidth - 10;
+    const headerHeight = layoutHeight * 0.75 - 10;
+    const headerWidth = layoutWidth - 10;
     const MINIMUM_VIABLE_TILE_SIZE = 3;
     
-    let maxWidth = Math.floor(bodyWidth / MINIMUM_VIABLE_TILE_SIZE);
-    let maxHeight = Math.floor(bodyHeight / MINIMUM_VIABLE_TILE_SIZE);
+    let maxWidth = Math.floor(headerWidth / MINIMUM_VIABLE_TILE_SIZE);
+    let maxHeight = Math.floor(headerHeight / MINIMUM_VIABLE_TILE_SIZE);
     
     maxWidth = maxWidth - (maxWidth % STEP) + 1;
     maxHeight = maxHeight - (maxHeight % STEP) + 1;
 
     return { maxWidth, maxHeight };
+}
+
+function updateMaxSizeLabel() {
+    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+    const maxOption = levelSelect.querySelector('option[value="max"]');
+    if (maxOption) {
+        maxOption.textContent = `전문(Max): ${maxWidth} x ${maxHeight}`;
+    }
 }
 
 function showStartScreen() {
@@ -296,8 +303,7 @@ function showStartScreen() {
     multiplayerChoiceContainer.classList.add('hidden');
     lobbyContainer.classList.add('hidden');
     customSizeContainer.classList.add('hidden');
-    backToGameMode.classList.add('hidden');
-    roomInfoContainer.classList.add('hidden');
+    homeButton.style.display = 'none';
 
     // 닉네임 UI 초기화
     nicknameInput.value = '';
@@ -600,7 +606,6 @@ function handleQButton() {
     if (gameWon || qButtonUsed) return;
     qButtonUsed = true;
     qButton.disabled = true;
-    qButton_joystick.disabled = true;
     playSound(spotSaveSound);
     player = { ...startPos };
     playerPath = [{ ...player }];
@@ -610,7 +615,6 @@ function handleWButton() {
     if (gameWon || wButtonUsed) return;
     wButtonUsed = true;
     wButton.disabled = true;
-    wButton_joystick.disabled = true;
     playSound(pastStepSound);
     
     if (wButtonClearInterval) clearInterval(wButtonClearInterval);
@@ -628,7 +632,7 @@ function startContinuousMove(direction) {
     if (gameWon || moveIntervals[direction]) return;
     const moveMap = { 'up': () => movePlayer(0, -1), 'down': () => movePlayer(0, 1), 'left': () => movePlayer(-1, 0), 'right': () => movePlayer(1, 0) };
     moveMap[direction]();
-    moveIntervals[direction] = setInterval(moveMap[direction], 150);
+    moveIntervals[direction] = setInterval(moveMap[direction], 75); // Delay reduced by 50%
 }
 function stopContinuousMove(direction) {
     if (moveIntervals[direction]) {
@@ -854,7 +858,7 @@ function startGameplay() {
     for (let key in savedPositions) savedPositions[key] = null;
 
     [winModal, helpModal, screenshotModal].forEach(modal => modal.style.display = 'none');
-    [wButton, wButton_joystick, qButton, qButton_joystick].forEach(btn => btn.disabled = false);
+    [wButton, qButton].forEach(btn => btn.disabled = false);
     clearInterval(timerInterval);
     
     player = { ...startPos };
@@ -885,26 +889,38 @@ function setupEventListeners() {
         container.addEventListener('click', (e) => {
             if (e.target.classList.contains('control-mode-button')) {
                 controlMode = e.target.dataset.mode;
+                mainLayout.className = `main-layout mode-${controlMode}`;
                 document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
                 document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.style.backgroundColor = '#4F46E5');
             }
         });
     });
 
-    ageButtonsContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('age-button')) {
-            const size = parseInt(e.target.dataset.size);
-            MAZE_WIDTH = size; MAZE_HEIGHT = size;
-            mainLayout.className = `main-layout mode-${controlMode}`;
-            startScreenModal.style.display = 'none';
-            mainLayout.style.display = 'flex';
-            initGame();
+    startPresetButton.addEventListener('click', () => {
+        const level = levelSelect.value;
+        if (level === 'max') {
+            const { maxWidth, maxHeight } = calculateMaxMazeSize();
+            MAZE_WIDTH = maxWidth;
+            MAZE_HEIGHT = maxHeight;
+        } else {
+            const size = parseInt(level);
+            MAZE_WIDTH = size;
+            MAZE_HEIGHT = size;
         }
+        mainLayout.className = `main-layout mode-${controlMode}`;
+        startScreenModal.style.display = 'none';
+        mainLayout.style.display = 'flex';
+        initGame();
     });
+
     customSizeBtn.addEventListener('click', () => {
-        ageButtonsContainer.parentElement.classList.add('hidden');
+        levelSelect.parentElement.classList.add('hidden');
+        startPresetButton.classList.add('hidden');
+        randomSizeButton.classList.add('hidden');
+        customSizeBtn.classList.add('hidden');
         customSizeContainer.classList.remove('hidden');
     });
+
     startButton.addEventListener('click', () => {
         MAZE_WIDTH = parseInt(mazeWidthSelect.value);
         MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
@@ -913,10 +929,15 @@ function setupEventListeners() {
         mainLayout.style.display = 'flex';
         initGame();
     });
+
     backToPresetButton.addEventListener('click', () => {
         customSizeContainer.classList.add('hidden');
-        ageButtonsContainer.parentElement.classList.remove('hidden');
+        levelSelect.parentElement.classList.remove('hidden');
+        startPresetButton.classList.remove('hidden');
+        randomSizeButton.classList.remove('hidden');
+        customSizeBtn.classList.remove('hidden');
     });
+
     randomSizeButton.addEventListener('click', () => {
         const sizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
         const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
@@ -931,13 +952,14 @@ function setupEventListeners() {
     singlePlayerBtn.addEventListener('click', () => {
         gameModeContainer.classList.add('hidden');
         singlePlayerContainer.classList.remove('hidden');
-        backToGameMode.classList.remove('hidden');
+        homeButton.style.display = 'flex';
+        updateMaxSizeLabel();
     });
 
     multiplayerBtn.addEventListener('click', () => {
         gameModeContainer.classList.add('hidden');
         multiplayerChoiceContainer.classList.remove('hidden');
-        backToGameMode.classList.remove('hidden');
+        homeButton.style.display = 'flex';
     });
 
     nicknameInput.addEventListener('input', () => {
@@ -963,7 +985,7 @@ function setupEventListeners() {
         }
     });
 
-    backToGameMode.addEventListener('click', showStartScreen);
+    homeButton.addEventListener('click', showStartScreen);
 
     createNewGameBtn.addEventListener('click', () => {
         playerRole = 'master';
@@ -1078,12 +1100,10 @@ function setupEventListeners() {
     document.addEventListener('mouseup', stopJoystick);
     document.addEventListener('touchend', stopJoystick);
 
-    [qButton, qButton_joystick].forEach(btn => btn.addEventListener('click', handleQButton));
-    [wButton, wButton_joystick].forEach(btn => btn.addEventListener('click', handleWButton));
+    [qButton].forEach(btn => btn.addEventListener('click', handleQButton));
+    [wButton].forEach(btn => btn.addEventListener('click', handleWButton));
     for (const key in rollbackButtons) {
-        rollbackButtons[key].forEach(btn => {
-            if (btn) btn.addEventListener('click', () => saveOrLoadPosition(key));
-        });
+        if (rollbackButtons[key]) rollbackButtons[key].addEventListener('click', () => saveOrLoadPosition(key));
     }
     
     restartButton.addEventListener('click', initGame);
@@ -1107,8 +1127,9 @@ function setupEventListeners() {
     window.addEventListener('resize', () => { 
         if (mainLayout.style.display === 'flex') { 
             initializeCanvasSize(); 
-        } else if (startScreenModal.style.display === 'flex') {
-            // calculateAndDisplayMaxMazeSize(); // This function was removed as per request
+        }
+        if (singlePlayerContainer.classList.contains('hidden') === false) {
+            updateMaxSizeLabel();
         }
     });
 }
