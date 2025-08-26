@@ -24,48 +24,51 @@
             <h2>미로 찾기 게임</h2>
             
             <div id="gameModeContainer" class="maze-size-input-group">
-                <label>게임 방식:</label>
-                <div class="flex gap-2 justify-center">
-                    <button id="singlePlayerBtn" class="action-button">혼자하기</button>
-                    <button id="multiplayerBtn" class="action-button">함께하기</button>
+                <div class="flex gap-4 justify-center w-full">
+                    <button id="singlePlayerBtn" class="action-button game-mode-button">혼자하기</button>
+                    <button id="multiplayerBtn" class="action-button game-mode-button">함께하기</button>
                 </div>
             </div>
 
             <div id="singlePlayerContainer" class="hidden">
-                <div class="maze-size-input-group">
-                    <label>조작 방식 선택:</label>
-                    <div id="controlModeContainer" class="flex gap-2 justify-center">
-                        <button class="action-button control-mode-button" data-mode="keyboard">키보드 방식</button>
-                        <button class="action-button control-mode-button" data-mode="joystick">조이스틱 방식</button>
+                <div class="setting-group">
+                    <div class="flex items-center justify-between gap-2">
+                        <label>조작 방식:</label>
+                        <div id="controlModeContainer" class="flex gap-2 justify-center">
+                            <button class="action-button control-mode-button" data-mode="keyboard">키보드</button>
+                            <button class="action-button control-mode-button" data-mode="joystick">조이스틱</button>
+                        </div>
                     </div>
                 </div>
-                <div class="maze-size-input-group">
-                    <label for="levelSelect">미로 크기 선택:</label>
-                    <select id="levelSelect" class="maze-size-input">
-                        <option value="43">기초: 43 x 43</option>
-                        <option value="67">보통: 67 x 67</option>
-                        <option value="91" selected>숙련: 91 x 91</option>
-                        <option value="max">전문(Max): </option>
-                    </select>
-                </div>
-                <div class="flex gap-2 flex-wrap justify-center mt-2">
-                    <button id="randomSizeButton" class="action-button" style="background-color: #A7C7E7;">랜덤</button>
-                    <button id="customSizeBtn" class="action-button" style="background-color: #A7C7E7;">직접 설정</button>
-                </div>
-                <button id="startPresetButton" class="start-button mt-4">게임 시작</button>
 
-                <div id="customSizeContainer" class="maze-size-input-group hidden mt-4">
-                    <label for="mazeWidthSelect">직접 설정 (가로 x 세로):</label>
-                    <div class="maze-size-input">
-                        <select id="mazeWidthSelect"></select>
-                        <span>x</span>
-                        <select id="mazeHeightSelect"></select>
+                <div class="setting-group">
+                    <div id="presetRow" class="flex items-center justify-between gap-2">
+                        <button id="presetModeBtn" class="action-button">미로 크기</button>
+                        <div id="presetContent" class="flex items-center gap-2">
+                            <select id="levelSelect" class="maze-size-input">
+                                <option value="43">기초: 43 x 43</option>
+                                <option value="67">보통: 67 x 67</option>
+                                <option value="91" selected>숙련: 91 x 91</option>
+                                <option value="max">전문(Max): </option>
+                            </select>
+                        </div>
                     </div>
-                    <p class="size-limit-text">크기를 선택해주세요.</p>
-                    <div class="flex gap-2 mt-2">
-                        <button id="backToPresetButton" class="action-button reset-size-button">돌아가기</button>
-                        <button id="startButton" class="start-button">게임 시작</button>
+                </div>
+
+                <div class="setting-group">
+                     <div id="customRow" class="flex items-center justify-between gap-2">
+                        <button id="customModeBtn" class="action-button">직접 설정</button>
+                        <div id="customContent" class="maze-size-input">
+                            <select id="mazeWidthSelect"></select>
+                            <span>x</span>
+                            <select id="mazeHeightSelect"></select>
+                        </div>
                     </div>
+                </div>
+                
+                <div class="flex gap-2 mt-2">
+                    <button id="startSinglePlayerButton" class="start-button">게임 시작</button>
+                    <button id="randomSizeButton" class="action-button" style="background-color: #A7C7E7;">랜덤</button>
                 </div>
             </div>
 
@@ -84,33 +87,51 @@
             </div>
 
             <div id="lobbyContainer" class="maze-size-input-group hidden">
-                <div id="roomInfoContainer" class="hidden items-center justify-center gap-2 mb-3">
+                <div id="roomInfoContainer" class="w-full flex items-center justify-center gap-2 mb-3">
                     <span class="text-sm text-gray-600">방 ID: <strong id="roomIdDisplay" class="text-lg"></strong></span>
                     <button id="copyRoomIdBtn" class="action-button" style="font-size: 0.8rem; padding: 4px 8px;">복사</button>
                 </div>
                 
-                <div class="maze-size-input-group">
-                    <label>조작 방식 선택:</label>
-                    <div id="controlModeContainerLobby" class="flex gap-2 justify-center">
-                        <button class="action-button control-mode-button" data-mode="keyboard">키보드 방식</button>
-                        <button class="action-button control-mode-button" data-mode="joystick">조이스틱 방식</button>
+                <div class="setting-group">
+                    <div class="flex items-center justify-between gap-2">
+                        <label>조작 방식:</label>
+                        <div id="controlModeContainerLobby" class="flex gap-2 justify-center">
+                            <button class="action-button control-mode-button" data-mode="keyboard">키보드</button>
+                            <button class="action-button control-mode-button" data-mode="joystick">조이스틱</button>
+                        </div>
                     </div>
                 </div>
 
-                <label for="mazeWidthSelectLobby">미로 크기 (가로 x 세로):</label>
-                <div class="maze-size-input">
-                    <select id="mazeWidthSelectLobby"></select>
-                    <span>x</span>
-                    <select id="mazeHeightSelectLobby"></select>
-                    <button id="randomSizeButtonLobby" class="action-button" style="background-color: #A7C7E7; margin-left: 5px; padding: 8px 12px; font-size: 0.9rem;">랜덤</button>
+                <div class="setting-group">
+                    <div class="flex items-center justify-between gap-2">
+                        <button id="presetModeBtnLobby" class="action-button">미로 크기</button>
+                        <div id="presetContentLobby" class="flex items-center gap-2">
+                            <select id="levelSelectLobby" class="maze-size-input">
+                                <option value="43">기초: 43 x 43</option>
+                                <option value="67">보통: 67 x 67</option>
+                                <option value="91" selected>숙련: 91 x 91</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <p class="size-limit-text">크기를 선택해주세요.</p>
+
+                <div class="setting-group">
+                     <div class="flex items-center justify-between gap-2">
+                        <button id="customModeBtnLobby" class="action-button">직접 설정</button>
+                        <div id="customContentLobby" class="maze-size-input">
+                            <select id="mazeWidthSelectLobby"></select>
+                            <span>x</span>
+                            <select id="mazeHeightSelectLobby"></select>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex gap-2 mt-2">
-                    <button id="backToMultiplayerChoiceButton" class="action-button reset-size-button">돌아가기</button>
                     <div class="relative flex-grow">
                         <button id="startLobbyButton" class="start-button w-full">게임 시작</button>
                         <button id="readyButton" class="start-button absolute top-0 left-0 w-full h-full flex items-center justify-center" style="background-color: var(--color-green-pastel);">준비</button>
                     </div>
+                    <button id="randomSizeButtonLobby" class="action-button" style="background-color: #A7C7E7;">랜덤</button>
                 </div>
             </div>
         </div>

@@ -31,7 +31,6 @@ const helpButton = document.getElementById('helpButton');
 const randomSizeButton = document.getElementById('randomSizeButton');
 const qButton = document.getElementById('qButton');
 const wButton = document.getElementById('wButton');
-const backToPresetButton = document.getElementById('backToPresetButton');
 const soundToggleButton = document.getElementById('soundToggleButton');
 const homeButton = document.getElementById('homeButton');
 
@@ -48,14 +47,15 @@ const joystickKnob = document.getElementById('joystickKnob');
 // Start Screen
 const startScreenModal = document.getElementById('startScreenModal');
 const controlModeContainer = document.getElementById('controlModeContainer');
-const controlModeContainerLobby = document.getElementById('controlModeContainerLobby');
 const levelSelect = document.getElementById('levelSelect');
-const startPresetButton = document.getElementById('startPresetButton');
-const customSizeBtn = document.getElementById('customSizeBtn');
-const customSizeContainer = document.getElementById('customSizeContainer');
+const startSinglePlayerButton = document.getElementById('startSinglePlayerButton');
+const customModeBtn = document.getElementById('customModeBtn');
 const mazeWidthSelect = document.getElementById('mazeWidthSelect');
 const mazeHeightSelect = document.getElementById('mazeHeightSelect');
-const startButton = document.getElementById('startButton');
+const presetModeBtn = document.getElementById('presetModeBtn');
+const presetContent = document.getElementById('presetContent');
+const customContent = document.getElementById('customContent');
+
 
 // --- 추가된 DOM 요소 (멀티플레이) ---
 const gameModeContainer = document.getElementById('gameModeContainer');
@@ -73,15 +73,22 @@ const lobbyContainer = document.getElementById('lobbyContainer');
 const roomInfoContainer = document.getElementById('roomInfoContainer');
 const roomIdDisplay = document.getElementById('roomIdDisplay');
 const copyRoomIdBtn = document.getElementById('copyRoomIdBtn');
-const mazeWidthSelectLobby = document.getElementById('mazeWidthSelectLobby');
-const mazeHeightSelectLobby = document.getElementById('mazeHeightSelectLobby');
-const randomSizeButtonLobby = document.getElementById('randomSizeButtonLobby');
-const backToMultiplayerChoiceButton = document.getElementById('backToMultiplayerChoiceButton');
 const startLobbyButton = document.getElementById('startLobbyButton');
 const readyButton = document.getElementById('readyButton');
 const roomListModal = document.getElementById('roomListModal');
 const roomListContainer = document.getElementById('roomListContainer');
 const closeRoomListModalButton = document.getElementById('closeRoomListModalButton');
+
+// Lobby UI elements
+const controlModeContainerLobby = document.getElementById('controlModeContainerLobby');
+const presetModeBtnLobby = document.getElementById('presetModeBtnLobby');
+const customModeBtnLobby = document.getElementById('customModeBtnLobby');
+const presetContentLobby = document.getElementById('presetContentLobby');
+const customContentLobby = document.getElementById('customContentLobby');
+const levelSelectLobby = document.getElementById('levelSelectLobby');
+const mazeWidthSelectLobby = document.getElementById('mazeWidthSelectLobby');
+const mazeHeightSelectLobby = document.getElementById('mazeHeightSelectLobby');
+const randomSizeButtonLobby = document.getElementById('randomSizeButtonLobby');
 
 
 // Modals
@@ -120,6 +127,9 @@ let flagAnimationTime = 0;
 let savedPositions = { '1': null, '2': null };
 var moveIntervals = {};
 let moveSoundTimeout = null;
+let singlePlayerSizeMode = 'preset'; // 'preset' or 'custom'
+let lobbySizeMode = 'preset';
+
 
 // 멀티플레이어 상태
 let socket;
@@ -135,8 +145,8 @@ let isJoystickActive = false;
 let joystickInitialTimeout = null;
 let joystickRepeatInterval = null;
 let joystickDx = 0, joystickDy = 0;
-const JOYSTICK_INITIAL_DELAY = 300;
-const JOYSTICK_REPEAT_DELAY = 200;
+const JOYSTICK_INITIAL_DELAY = 150;
+const JOYSTICK_REPEAT_DELAY = 100;
 
 // Audio state
 let audioContextResumed = false;
@@ -268,15 +278,20 @@ function calculateMaxMazeSize() {
     const availableScreenHeight = window.innerHeight;
     const layoutWidth = availableScreenWidth;
     const layoutHeight = availableScreenHeight - 40;
-    const headerHeight = layoutHeight * 0.75 - 10;
-    const headerWidth = layoutWidth - 10;
+    const headerHeight = 60; // Fixed header height
+    const footerHeight = layoutHeight * 0.25; // Footer height percentage
+    const bodyPadding = 10; // 5px top + 5px bottom
+    
+    const availableBodyHeight = layoutHeight - headerHeight - footerHeight - bodyPadding;
+    const availableBodyWidth = layoutWidth - bodyPadding;
+
     const MINIMUM_VIABLE_TILE_SIZE = 3;
     
-    let maxWidth = Math.floor(headerWidth / MINIMUM_VIABLE_TILE_SIZE);
-    let maxHeight = Math.floor(headerHeight / MINIMUM_VIABLE_TILE_SIZE);
+    let maxWidth = Math.floor(availableBodyWidth / MINIMUM_VIABLE_TILE_SIZE);
+    let maxHeight = Math.floor(availableBodyHeight / MINIMUM_VIABLE_TILE_SIZE);
     
-    maxWidth = maxWidth - (maxWidth % STEP) + 1;
-    maxHeight = maxHeight - (maxHeight % STEP) + 1;
+    maxWidth = Math.max(1, maxWidth - (maxWidth % STEP) + 1);
+    maxHeight = Math.max(1, maxHeight - (maxHeight % STEP) + 1);
 
     return { maxWidth, maxHeight };
 }
@@ -302,7 +317,6 @@ function showStartScreen() {
     singlePlayerContainer.classList.add('hidden');
     multiplayerChoiceContainer.classList.add('hidden');
     lobbyContainer.classList.add('hidden');
-    customSizeContainer.classList.add('hidden');
     homeButton.style.display = 'none';
 
     // 닉네임 UI 초기화
@@ -313,15 +327,31 @@ function showStartScreen() {
     createNewGameBtn.disabled = true;
     joinGameBtn.disabled = true;
 
-    document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
-    const selectedBtn = document.querySelector(`.control-mode-button[data-mode="${controlMode}"]`);
-    if(selectedBtn) selectedBtn.style.backgroundColor = '#4F46E5';
+    // 싱글플레이어 설정 초기화
+    controlMode = 'keyboard';
+    document.querySelectorAll('.control-mode-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll(`.control-mode-button[data-mode="keyboard"]`).forEach(btn => btn.classList.add('active'));
+    levelSelect.value = '43';
+    setSinglePlayerSizeMode('preset');
+    
+    populateSizeDropdowns();
+    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+    mazeWidthSelect.value = Math.min(127, maxWidth);
+    mazeHeightSelect.value = Math.min(127, maxHeight);
 }
 
 function updateLobbyUI(isMaster) {
-    mazeWidthSelectLobby.disabled = !isMaster;
-    mazeHeightSelectLobby.disabled = !isMaster;
-    randomSizeButtonLobby.disabled = !isMaster;
+    const isCustom = lobbySizeMode === 'custom';
+
+    levelSelectLobby.disabled = !isMaster || isCustom;
+    mazeWidthSelectLobby.disabled = !isMaster || !isCustom;
+    mazeHeightSelectLobby.disabled = !isMaster || !isCustom;
+    presetModeBtnLobby.disabled = !isMaster;
+    customModeBtnLobby.disabled = !isMaster;
+    
+    if (randomSizeButtonLobby) {
+        randomSizeButtonLobby.style.display = isMaster ? 'flex' : 'none';
+    }
     
     if (isMaster) {
         readyButton.style.display = 'flex';
@@ -330,7 +360,7 @@ function updateLobbyUI(isMaster) {
     } else { 
         readyButton.style.display = 'flex';
         startLobbyButton.style.display = 'none';
-        roomInfoContainer.style.display = 'none';
+        roomInfoContainer.style.display = 'flex';
     }
 }
 
@@ -521,13 +551,16 @@ function checkWin() {
         gameWon = true;
         clearInterval(timerInterval);
         
+        const finishTime = updateTimerDisplay();
+
         if (socket) {
-            socket.emit('playerFinished', { finishTime: updateTimerDisplay() });
+            socket.emit('playerFinished', { finishTime });
+            showWaitingModal(finishTime);
         } else {
             showGameOverModal({
-                clearTime: updateTimerDisplay(),
+                clearTime: finishTime,
                 mazeSize: `${MAZE_WIDTH} x ${MAZE_HEIGHT}`,
-                rankings: [{ rank: 1, nickname: '나', finishTime: updateTimerDisplay() }]
+                rankings: [{ rank: 1, nickname: '나', finishTime: finishTime }]
             });
         }
         
@@ -708,12 +741,22 @@ function setupSocketListeners() {
     socket.on('roomCreated', ({ roomId }) => {
         currentRoomId = roomId;
         roomIdDisplay.textContent = roomId;
+        playerRole = 'master';
+        updateLobbyUI(true);
     });
 
-    socket.on('joinSuccess', () => {
+    socket.on('joinSuccess', ({ room }) => {
         console.log('방에 성공적으로 참여했습니다.');
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
+        playerRole = 'guest';
+
+        // 방장이 설정한 내용으로 UI 업데이트
+        setLobbySizeMode(room.settings.mode);
+        levelSelectLobby.value = room.settings.preset;
+        mazeWidthSelectLobby.value = room.settings.width;
+        mazeHeightSelectLobby.value = room.settings.height;
+
         updateLobbyUI(false);
     });
 
@@ -741,6 +784,8 @@ function setupSocketListeners() {
 
     socket.on('lobbyStateUpdate', (lobbyState) => {
         if (playerRole === 'guest') {
+            setLobbySizeMode(lobbyState.settings.mode);
+            levelSelectLobby.value = lobbyState.settings.preset;
             mazeWidthSelectLobby.value = lobbyState.settings.width;
             mazeHeightSelectLobby.value = lobbyState.settings.height;
         }
@@ -804,38 +849,40 @@ function setupSocketListeners() {
     socket.on('playerDisconnected', (playerId) => delete otherPlayers[playerId]);
 }
 
+function showWaitingModal(finishTime) {
+    let waitingHTML = `
+        <span id="winEmoji" style="animation: none;">🏁</span>
+        <p class="win-message-line">기록: ${finishTime}</p>
+        <p class="win-message-line" style="font-size: 1.2rem; margin-top: 1rem;">다른 플레이어를 기다리는 중...</p>
+    `;
+    winModalContent.innerHTML = waitingHTML;
+    winModal.style.display = 'flex';
+}
+
 function showGameOverModal(data) {
     let rankingHTML = `
         <span id="winEmoji">🎉</span>
-        <p class="win-message-line">클리어 시간: ${data.clearTime}</p>
+        <p class="win-message-line">1등 기록: ${data.clearTime}</p>
         <p class="win-message-line">미로 크기: ${data.mazeSize}</p>
         <div class="w-full mt-4 border-t pt-4">
             <h3 class="text-lg font-bold mb-2">전체 순위</h3>
     `;
     data.rankings.forEach(player => {
         const isMe = socket ? player.id === socket.id : player.rank === 1;
-        rankingHTML += `<p class="text-md ${isMe ? 'font-bold text-blue-600' : ''}">${player.rank}위: ${player.nickname} (${player.finishTime})</p>`;
+        const timeText = player.finishTime === 'retire' ? '<span class="text-red-500">Retire</span>' : player.finishTime;
+        rankingHTML += `<p class="text-md ${isMe ? 'font-bold text-blue-600' : ''}">${player.rank}위: ${player.nickname} (${timeText})</p>`;
     });
     rankingHTML += '</div>';
     
     rankingHTML += `
         <div class="win-modal-buttons mt-4">
-            <button id="gameOverRestartBtn" class="action-button">다시하기</button>
-            <button id="gameOverSettingsBtn" class="action-button">설정화면</button>
+            <button id="gameOverSettingsBtn" class="action-button">로비로 돌아가기</button>
             <button id="gameOverScreenshotBtn" class="action-button">스크린샷</button>
         </div>
     `;
     
     winModalContent.innerHTML = rankingHTML;
     
-    document.getElementById('gameOverRestartBtn').addEventListener('click', () => {
-        winModal.style.display = 'none';
-        if (socket) {
-            showStartScreen();
-        } else {
-            initGame();
-        }
-    });
     document.getElementById('gameOverSettingsBtn').addEventListener('click', showStartScreen);
     document.getElementById('gameOverScreenshotBtn').addEventListener('click', takeScreenshot);
 
@@ -849,7 +896,7 @@ function startGameplay() {
     clearTimeout(moveSoundTimeout);
     if (gallopingSound) gallopingSound.pause();
 
-    gameWon = false;
+    gameWon = false; 
     wButtonUsed = false;
     qButtonUsed = false;
     if (wButtonClearInterval) clearInterval(wButtonClearInterval);
@@ -857,7 +904,11 @@ function startGameplay() {
     wButtonPathColor = getRandomTransparentColor();
     for (let key in savedPositions) savedPositions[key] = null;
 
-    [winModal, helpModal, screenshotModal].forEach(modal => modal.style.display = 'none');
+    [winModal, helpModal, screenshotModal].forEach(modal => {
+        if(modal.id !== 'winModal' || !socket) { // 멀티플레이 시 대기 화면이 떠있을 수 있으므로 winModal은 닫지 않음
+            modal.style.display = 'none';
+        }
+    });
     [wButton, qButton].forEach(btn => btn.disabled = false);
     clearInterval(timerInterval);
     
@@ -884,69 +935,91 @@ function initGame() {
     startGameplay();
 }
 
+function setSinglePlayerSizeMode(mode) {
+    singlePlayerSizeMode = mode;
+    if (mode === 'preset') {
+        presetContent.classList.remove('disabled-content');
+        customContent.classList.add('disabled-content');
+        presetModeBtn.classList.add('active');
+        customModeBtn.classList.remove('active');
+    } else { // 'custom'
+        presetContent.classList.add('disabled-content');
+        customContent.classList.remove('disabled-content');
+        presetModeBtn.classList.remove('active');
+        customModeBtn.classList.add('active');
+        populateSizeDropdowns();
+    }
+}
+
+function setLobbySizeMode(mode) {
+    lobbySizeMode = mode;
+    if (mode === 'preset') {
+        presetContentLobby.classList.remove('disabled-content');
+        customContentLobby.classList.add('disabled-content');
+        presetModeBtnLobby.classList.add('active');
+        customModeBtnLobby.classList.remove('active');
+    } else { // 'custom'
+        presetContentLobby.classList.add('disabled-content');
+        customContentLobby.classList.remove('disabled-content');
+        presetModeBtnLobby.classList.remove('active');
+        customModeBtnLobby.classList.add('active');
+        populateSizeDropdowns();
+    }
+    updateLobbyUI(playerRole === 'master');
+}
+
+
 function setupEventListeners() {
     [controlModeContainer, controlModeContainerLobby].forEach(container => {
         container.addEventListener('click', (e) => {
             if (e.target.classList.contains('control-mode-button')) {
                 controlMode = e.target.dataset.mode;
                 mainLayout.className = `main-layout mode-${controlMode}`;
-                document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
-                document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.style.backgroundColor = '#4F46E5');
+                
+                document.querySelectorAll('.control-mode-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.classList.add('active'));
             }
         });
     });
 
-    startPresetButton.addEventListener('click', () => {
-        const level = levelSelect.value;
-        if (level === 'max') {
-            const { maxWidth, maxHeight } = calculateMaxMazeSize();
-            MAZE_WIDTH = maxWidth;
-            MAZE_HEIGHT = maxHeight;
-        } else {
-            const size = parseInt(level);
-            MAZE_WIDTH = size;
-            MAZE_HEIGHT = size;
+    startSinglePlayerButton.addEventListener('click', () => {
+        if (singlePlayerSizeMode === 'preset') {
+            const level = levelSelect.value;
+            if (level === 'max') {
+                const { maxWidth, maxHeight } = calculateMaxMazeSize();
+                MAZE_WIDTH = maxWidth;
+                MAZE_HEIGHT = maxHeight;
+            } else {
+                const size = parseInt(level);
+                MAZE_WIDTH = size;
+                MAZE_HEIGHT = size;
+            }
+        } else { // 'custom'
+            MAZE_WIDTH = parseInt(mazeWidthSelect.value);
+            MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
         }
+        
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
         initGame();
     });
 
-    customSizeBtn.addEventListener('click', () => {
-        levelSelect.parentElement.classList.add('hidden');
-        startPresetButton.classList.add('hidden');
-        randomSizeButton.classList.add('hidden');
-        customSizeBtn.classList.add('hidden');
-        customSizeContainer.classList.remove('hidden');
-    });
-
-    startButton.addEventListener('click', () => {
-        MAZE_WIDTH = parseInt(mazeWidthSelect.value);
-        MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
-        mainLayout.className = `main-layout mode-${controlMode}`;
-        startScreenModal.style.display = 'none';
-        mainLayout.style.display = 'flex';
-        initGame();
-    });
-
-    backToPresetButton.addEventListener('click', () => {
-        customSizeContainer.classList.add('hidden');
-        levelSelect.parentElement.classList.remove('hidden');
-        startPresetButton.classList.remove('hidden');
-        randomSizeButton.classList.remove('hidden');
-        customSizeBtn.classList.remove('hidden');
-    });
+    presetModeBtn.addEventListener('click', () => setSinglePlayerSizeMode('preset'));
+    customModeBtn.addEventListener('click', () => setSinglePlayerSizeMode('custom'));
 
     randomSizeButton.addEventListener('click', () => {
-        const sizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
-        const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
-        MAZE_WIDTH = randomSize;
-        MAZE_HEIGHT = randomSize;
-        mainLayout.className = `main-layout mode-${controlMode}`;
-        startScreenModal.style.display = 'none';
-        mainLayout.style.display = 'flex';
-        initGame();
+        setSinglePlayerSizeMode('custom');
+    
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        const widthOptions = Array.from(mazeWidthSelect.options).filter(opt => parseInt(opt.value) <= maxWidth);
+        const heightOptions = Array.from(mazeHeightSelect.options).filter(opt => parseInt(opt.value) <= maxHeight);
+    
+        const randomWidthOption = widthOptions[Math.floor(Math.random() * widthOptions.length)];
+        const randomHeightOption = heightOptions[Math.floor(Math.random() * heightOptions.length)];
+    
+        mazeWidthSelect.value = randomWidthOption.value;
+        mazeHeightSelect.value = randomHeightOption.value;
     });
 
     singlePlayerBtn.addEventListener('click', () => {
@@ -954,6 +1027,7 @@ function setupEventListeners() {
         singlePlayerContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
         updateMaxSizeLabel();
+        setSinglePlayerSizeMode('preset'); 
     });
 
     multiplayerBtn.addEventListener('click', () => {
@@ -988,25 +1062,25 @@ function setupEventListeners() {
     homeButton.addEventListener('click', showStartScreen);
 
     createNewGameBtn.addEventListener('click', () => {
-        playerRole = 'master';
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
-        updateLobbyUI(true);
-        socket.emit('createGame', {
+        setLobbySizeMode('preset');
+        
+        const settings = {
+            mode: lobbySizeMode,
+            preset: levelSelectLobby.value,
             width: parseInt(mazeWidthSelectLobby.value),
             height: parseInt(mazeHeightSelectLobby.value)
-        });
+        };
+        socket.emit('createGame', settings);
     });
 
     joinGameBtn.addEventListener('click', () => {
-        playerRole = 'guest';
         socket.emit('requestRoomList');
         roomListModal.style.display = 'flex';
     });
 
-    closeRoomListModalButton.addEventListener('click', () => {
-        roomListModal.style.display = 'none';
-    });
+    closeRoomListModalButton.addEventListener('click', () => roomListModal.style.display = 'none');
 
     copyRoomIdBtn.addEventListener('click', () => {
         const roomId = roomIdDisplay.textContent;
@@ -1017,33 +1091,50 @@ function setupEventListeners() {
             }).catch(err => console.error('복사 실패:', err));
         }
     });
-
-    backToMultiplayerChoiceButton.addEventListener('click', () => {
-        lobbyContainer.classList.add('hidden');
-        multiplayerChoiceContainer.classList.remove('hidden');
-        socket.emit('leaveRoom');
+    
+    const sendLobbySettings = () => {
+        if (playerRole === 'master') {
+            const settings = {
+                mode: lobbySizeMode,
+                preset: levelSelectLobby.value,
+                width: parseInt(mazeWidthSelectLobby.value),
+                height: parseInt(mazeHeightSelectLobby.value)
+            };
+            socket.emit('settingsChanged', settings);
+        }
+    };
+    
+    presetModeBtnLobby.addEventListener('click', () => {
+        if (playerRole !== 'master') return;
+        setLobbySizeMode('preset');
+        sendLobbySettings();
+    });
+    customModeBtnLobby.addEventListener('click', () => {
+        if (playerRole !== 'master') return;
+        setLobbySizeMode('custom');
+        sendLobbySettings();
+    });
+    [levelSelectLobby, mazeWidthSelectLobby, mazeHeightSelectLobby].forEach(select => {
+        select.addEventListener('change', sendLobbySettings);
     });
 
     randomSizeButtonLobby.addEventListener('click', () => {
-        const sizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
-        const randomWidth = sizes[Math.floor(Math.random() * sizes.length)];
-        const randomHeight = sizes[Math.floor(Math.random() * sizes.length)];
-        mazeWidthSelectLobby.value = randomWidth;
-        mazeHeightSelectLobby.value = randomHeight;
-        if (playerRole === 'master') {
-            socket.emit('settingsChanged', { width: randomWidth, height: randomHeight });
-        }
-    });
+        if (playerRole !== 'master') return;
+        setLobbySizeMode('custom');
     
-    [mazeWidthSelectLobby, mazeHeightSelectLobby].forEach(select => {
-        select.addEventListener('change', () => {
-            if (playerRole === 'master') {
-                socket.emit('settingsChanged', {
-                    width: parseInt(mazeWidthSelectLobby.value),
-                    height: parseInt(mazeHeightSelectLobby.value)
-                });
-            }
-        });
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        const widthOptions = Array.from(mazeWidthSelectLobby.options).filter(opt => parseInt(opt.value) <= maxWidth);
+        const heightOptions = Array.from(mazeHeightSelectLobby.options).filter(opt => parseInt(opt.value) <= maxHeight);
+    
+        if (widthOptions.length > 0 && heightOptions.length > 0) {
+            const randomWidthOption = widthOptions[Math.floor(Math.random() * widthOptions.length)];
+            const randomHeightOption = heightOptions[Math.floor(Math.random() * heightOptions.length)];
+        
+            mazeWidthSelectLobby.value = randomWidthOption.value;
+            mazeHeightSelectLobby.value = randomHeightOption.value;
+
+            sendLobbySettings();
+        }
     });
 
     readyButton.addEventListener('click', () => {
@@ -1055,8 +1146,14 @@ function setupEventListeners() {
 
     startLobbyButton.addEventListener('click', () => {
         if (playerRole === 'master') {
-            MAZE_WIDTH = parseInt(mazeWidthSelectLobby.value);
-            MAZE_HEIGHT = parseInt(mazeHeightSelectLobby.value);
+            if (lobbySizeMode === 'preset') {
+                const size = parseInt(levelSelectLobby.value);
+                MAZE_WIDTH = size;
+                MAZE_HEIGHT = size;
+            } else {
+                MAZE_WIDTH = parseInt(mazeWidthSelectLobby.value);
+                MAZE_HEIGHT = parseInt(mazeHeightSelectLobby.value);
+            }
             generateMaze();
             placeStartEnd();
             socket.emit('gameDataReady', {
@@ -1138,23 +1235,34 @@ function populateSizeDropdowns() {
     const selects = [mazeWidthSelect, mazeHeightSelect, mazeWidthSelectLobby, mazeHeightSelectLobby];
     selects.forEach(s => s.innerHTML = '');
 
-    const sizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
-
-    sizes.forEach(size => {
-        [mazeWidthSelect, mazeWidthSelectLobby].forEach(s => s.add(new Option(size, size)));
-        [mazeHeightSelect, mazeHeightSelectLobby].forEach(s => s.add(new Option(size, size)));
-    });
+    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+    
+    for (let i = 43; i <= maxWidth; i += STEP) {
+        mazeWidthSelect.add(new Option(i, i));
+        mazeWidthSelectLobby.add(new Option(i, i));
+    }
+     for (let i = 43; i <= maxHeight; i += STEP) {
+        mazeHeightSelect.add(new Option(i, i));
+        mazeHeightSelectLobby.add(new Option(i,i));
+    }
+    
+    // Set default for custom, ensuring it doesn't exceed max
+    const defaultSize = Math.min(127, Math.min(maxWidth, maxHeight));
+    mazeWidthSelect.value = defaultSize;
+    mazeHeightSelect.value = defaultSize;
+    mazeWidthSelectLobby.value = defaultSize;
+    mazeHeightSelectLobby.value = defaultSize;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!CanvasRenderingContext2D.prototype.roundRect) {
         CanvasRenderingContext2D.prototype.roundRect=function(t,e,o,i,n){return o<2*n&&(n=o/2),i<2*n&&(n=i/2),this.beginPath(),this.moveTo(t+n,e),this.arcTo(t+o,e,t+o,e+i,n),this.arcTo(t+o,e+i,t,e+i,n),this.arcTo(t,e+i,t,e,n),this.arcTo(t,e,t+o,e,n),this.closePath(),this}
     }
-    populateSizeDropdowns();
+    
     setupEventListeners();
     initAudio();
     showStartScreen();
-
+    
     try {
         console.log("서버에 접속 시도 중... 주소:", "https://miromulti.onrender.com");
         socket = io("https://miromulti.onrender.com"); 

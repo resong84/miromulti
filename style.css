@@ -288,6 +288,7 @@ canvas {
     gap: 10px;
     margin-top: 0;
     flex-wrap: wrap; 
+    font-size: 0.9rem;
 }
 .game-info-container .timer-display {
     font-size: 1.1rem;
@@ -295,11 +296,12 @@ canvas {
 }
 .game-info-container .action-button,
 .game-info-container .help-button {
-    padding: 6px 12px;
+    padding: 8px 12px;
     font-size: 0.9rem;
 }
 .game-info-container .reset-size-button {
     font-size: 1.2rem;
+    padding: 8px 12px;
 }
 
 .timer-display {
@@ -319,12 +321,14 @@ canvas {
     box-shadow: 0 4px 6px var(--color-shadow);
     border: none;
     white-space: nowrap;
+    padding: 8px 16px;
+    font-size: 1.0rem;
 }
 .action-button:hover {
     background-color: var(--color-green-pastel-dark);
     transform: translateY(-2px);
 }
-.action-button:active {
+.action-button:active, .action-button.active {
     background-color: var(--color-green-pastel-darker);
     transform: translateY(0);
     box-shadow: 0 2px 4px var(--color-shadow);
@@ -347,6 +351,8 @@ canvas {
     cursor: pointer;
     transition: background-color 0.2s ease, transform 0.1s ease;
     box-shadow: 0 4px 6px var(--color-shadow);
+    padding: 8px 12px;
+    font-size: 1.1rem;
 }
 .help-button:hover {
     background-color: var(--color-blue-pastel-dark);
@@ -434,7 +440,7 @@ canvas {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     text-align: center;
     max-width: 400px; width: 90%;
-    display: flex; flex-direction: column; gap: 20px;
+    display: flex; flex-direction: column; gap: 15px;
     position: relative;
 }
 .home-button {
@@ -468,8 +474,15 @@ canvas {
     display: flex; flex-direction: column;
     gap: 10px; align-items: center;
 }
-.maze-size-input-group label {
+.control-mode-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+.control-mode-group label {
     font-size: 1.1rem; color: var(--color-text-secondary);
+    font-weight: bold;
 }
 .maze-size-input {
     display: flex; gap: 10px;
@@ -485,7 +498,7 @@ canvas {
     -moz-appearance: textfield;
 }
 #levelSelect {
-    min-width: 200px;
+    min-width: 180px;
     text-align: left;
     padding-left: 15px;
 }
@@ -518,6 +531,37 @@ canvas {
 .start-screen-error {
     color: var(--color-error); font-size: 0.9rem;
     margin-top: -10px; display: none;
+}
+.setting-group {
+    width: 100%;
+    border: 2px solid var(--color-bg-light);
+    border-radius: var(--radius-medium);
+    padding: 10px;
+}
+.setting-group .action-button {
+    background-color: var(--color-bg-light);
+    color: var(--color-text-secondary);
+}
+.setting-group .action-button.active {
+    background-color: var(--color-green-pastel-darker);
+    color: var(--color-text-inverted);
+}
+.control-mode-button {
+    background-color: var(--color-bg-light);
+    color: var(--color-text-secondary);
+}
+.control-mode-button.active {
+    background-color: var(--color-green-pastel-darker);
+    color: var(--color-text-inverted);
+}
+.game-mode-button {
+    font-size: 1.2rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+.disabled-content {
+    opacity: 0.5;
+    pointer-events: none;
 }
 .win-modal, .help-modal, .screenshot-modal {
     position: fixed; top: 0; left: 0;

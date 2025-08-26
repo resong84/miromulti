@@ -43,6 +43,41 @@ const broadcastRoomList = () => {
     io.emit('roomListUpdate', roomList);
 };
 
+const endGame = (roomId, timedOut) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const finalRankings = [...room.finishers];
+    finalRankings.sort((a, b) => a.rank - b.rank);
+
+    if (timedOut) {
+        const finisherIds = new Set(room.finishers.map(p => p.id));
+        const allPlayerIds = Object.keys(room.players);
+        
+        let retireRank = finalRankings.length + 1;
+        allPlayerIds.forEach(playerId => {
+            if (!finisherIds.has(playerId)) {
+                finalRankings.push({
+                    id: playerId,
+                    rank: retireRank,
+                    nickname: players[playerId]?.nickname || 'Unknown',
+                    finishTime: 'retire'
+                });
+            }
+        });
+    }
+
+    const finalData = {
+        clearTime: room.finishers[0]?.finishTime || 'N/A',
+        mazeSize: `${room.settings.width} x ${room.settings.height}`,
+        rankings: finalRankings
+    };
+
+    io.to(roomId).emit('gameOver', finalData);
+    delete rooms[roomId];
+    broadcastRoomList();
+};
+
 io.on('connection', (socket) => {
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
 
@@ -62,10 +97,11 @@ io.on('connection', (socket) => {
     rooms[roomId] = {
         id: roomId,
         players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true, nickname: players[socket.id].nickname } },
-        settings: { width: settings.width, height: settings.height },
+        settings: settings,
         gameStarted: false,
         finishers: [],
-        playerCount: 1
+        playerCount: 1,
+        timeoutId: null
     };
     console.log(`[진단] 방 생성됨: ${roomId}`);
     socket.emit('roomCreated', { roomId });
@@ -82,7 +118,7 @@ io.on('connection', (socket) => {
         room.playerCount++;
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
-        socket.emit('joinSuccess');
+        socket.emit('joinSuccess', { room });
         updateLobbyState(roomId);
         broadcastRoomList();
     } else {
@@ -91,13 +127,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('requestRoomList', () => {
-    const roomList = Object.values(rooms)
-        .filter(room => !room.gameStarted)
-        .map(room => ({
-            id: room.id,
-            playerCount: Object.keys(room.players).length
-        }));
-    socket.emit('roomListUpdate', roomList);
+    broadcastRoomList();
   });
 
   socket.on('playerReady', ({ isReady }) => {
@@ -144,14 +174,20 @@ io.on('connection', (socket) => {
         const rank = room.finishers.length + 1;
         room.finishers.push({ id: socket.id, rank, nickname: players[socket.id].nickname, finishTime });
         
+        if (room.finishers.length === 1 && room.playerCount > 1) {
+            console.log(`[진단] ${roomId} 방의 첫번째 플레이어 도착. 20초 카운트다운 시작.`);
+            room.timeoutId = setTimeout(() => {
+                console.log(`[진단] ${roomId} 방 20초 시간 초과. 게임을 종료합니다.`);
+                endGame(roomId, true);
+            }, 20000); 
+        }
+
         if (room.finishers.length === room.playerCount) {
-            const finalData = {
-                clearTime: room.finishers[0].finishTime, // 1등의 클리어 시간
-                mazeSize: `${room.settings.width} x ${room.settings.height}`,
-                rankings: room.finishers
-            };
-            io.to(roomId).emit('gameOver', finalData);
-            delete rooms[roomId];
+             console.log(`[진단] ${roomId} 방의 모든 플레이어 도착. 게임을 종료합니다.`);
+            if (room.timeoutId) {
+                clearTimeout(room.timeoutId);
+            }
+            endGame(roomId, false);
         }
     }
   });
@@ -166,14 +202,33 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`[진단] 플레이어 접속 해제: ${socket.id}`);
     const roomId = playerRooms[socket.id];
-    if (rooms[roomId]) {
-        delete rooms[roomId].players[socket.id];
-        rooms[roomId].playerCount--;
-        if (Object.keys(rooms[roomId].players).length === 0) {
+    const room = rooms[roomId];
+    if (room) {
+        const wasMaster = room.players[socket.id]?.isMaster;
+        delete room.players[socket.id];
+        room.playerCount--;
+
+        if (room.playerCount === 0) {
+            if (room.timeoutId) clearTimeout(room.timeoutId);
             delete rooms[roomId];
             console.log(`[진단] ${roomId} 방이 비어서 삭제됨.`);
         } else {
-            updateLobbyState(roomId);
+            if (wasMaster) {
+                // 남은 플레이어 중 한 명을 새로운 방장으로 임명 (간단하게 첫 번째 플레이어)
+                const newMasterId = Object.keys(room.players)[0];
+                if(newMasterId) {
+                    room.players[newMasterId].isMaster = true;
+                    console.log(`[진단] ${newMasterId}가 새로운 방장이 됨.`);
+                }
+            }
+
+            if (room.gameStarted && room.playerCount === room.finishers.length) {
+                console.log(`[진단] 플레이어(${socket.id}) 퇴장 후, 남은 인원이 모두 완주하여 ${roomId} 게임 종료.`);
+                if (room.timeoutId) clearTimeout(room.timeoutId);
+                endGame(roomId, false);
+            } else {
+                 updateLobbyState(roomId);
+            }
         }
         broadcastRoomList();
     }
