@@ -102,6 +102,16 @@
                     </div>
                 </div>
 
+                <!-- 말 선택 UI 추가 -->
+                <div class="setting-group">
+                    <div class="flex items-center justify-between gap-2">
+                        <label>말 선택:</label>
+                        <div id="characterSelectContainer" class="flex gap-2 justify-center">
+                            <!-- 캐릭터 버튼은 script.js에서 동적으로 생성됩니다. -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="setting-group">
                     <div class="flex items-center justify-between gap-2">
                         <button id="presetModeBtnLobby" class="action-button">미로 크기</button>
@@ -198,8 +208,6 @@
                     </div>
                 </div>
             </div>
-            <!-- 멀티플레이어 결과 푸터 -->
-            <div id="multiplayerResultFooter" class="multiplayer-result-footer" style="display: none;"></div>
         </footer>
     </div>
 
@@ -224,12 +232,9 @@
     </div>
     <div id="screenshotModal" class="screenshot-modal">
         <div class="screenshot-modal-content">
-            <h2>스크린샷</h2>
+            <h2>클립보드에 복사됨!</h2>
             <img id="screenshotImage" src="" alt="게임 스크린샷">
-            <div class="flex gap-2 mt-4 w-full">
-                <button id="copyScreenshotButton" class="action-button flex-1">복사</button>
-                <button id="closeScreenshotModalButton" class="action-button flex-1" style="background-color: var(--color-red-pastel);">닫기</button>
-            </div>
+            <button id="closeScreenshotModalButton" class="action-button">닫기</button>
         </div>
     </div>
 
