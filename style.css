@@ -71,15 +71,29 @@ body {
     transition: height 0.3s ease;
 }
 .game-header {
-    height: 75%;
+    height: 60px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-light);
+    border-bottom: 2px solid var(--color-border);
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+.game-body {
+    flex-grow: 1;
     width: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 5px;
     box-sizing: border-box;
-    flex-shrink: 0;
-    transition: height 0.3s ease, padding 0.3s ease;
+    min-height: 0;
+    transition: padding 0.3s ease;
 }
 .game-footer {
     height: 25%;
@@ -299,6 +313,12 @@ canvas {
     background-color: var(--color-green-pastel-darker);
     transform: translateY(0);
     box-shadow: 0 2px 4px var(--color-shadow);
+}
+.action-button.active-blue {
+    background-color: var(--color-blue-pastel);
+}
+.action-button.active-blue:hover {
+    background-color: var(--color-blue-pastel-dark);
 }
 .reset-size-button { background-color: var(--color-red-pastel); }
 .reset-size-button:hover { background-color: var(--color-red-pastel-dark); }
@@ -530,7 +550,7 @@ canvas {
 /* =================================================================== */
 @media (max-width: 640px) {
     .main-layout { padding: 16px; height: 100vh; }
-    .game-header { height: 60%; }
+    .game-header { height: 50px; font-size: 1.5rem; }
     .game-footer { height: 40%; }
     .directional-controls { width: 120px; height: auto; gap: 3px; }
     .arrow-button { width: 47px; height: 47px; font-size: 1.5rem; }

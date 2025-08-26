@@ -28,7 +28,7 @@ const clearSound = document.getElementById('clearSound');
 const restartButton = document.getElementById('restartButton');
 const resetSizeButton = document.getElementById('resetSizeButton');
 const helpButton = document.getElementById('helpButton');
-const autoFitButton = document.getElementById('autoFitButton');
+const randomSizeButton = document.getElementById('randomSizeButton');
 const qButton = document.getElementById('qButton');
 const wButton = document.getElementById('wButton');
 const qButton_joystick = document.getElementById('qButton_joystick');
@@ -75,7 +75,7 @@ const roomIdDisplay = document.getElementById('roomIdDisplay');
 const copyRoomIdBtn = document.getElementById('copyRoomIdBtn');
 const mazeWidthSelectLobby = document.getElementById('mazeWidthSelectLobby');
 const mazeHeightSelectLobby = document.getElementById('mazeHeightSelectLobby');
-const autoFitButtonLobby = document.getElementById('autoFitButtonLobby');
+const randomSizeButtonLobby = document.getElementById('randomSizeButtonLobby');
 const backToMultiplayerChoiceButton = document.getElementById('backToMultiplayerChoiceButton');
 const startLobbyButton = document.getElementById('startLobbyButton');
 const readyButton = document.getElementById('readyButton');
@@ -179,11 +179,11 @@ function initializeCanvasSize() {
     const minTileSize = 3; 
     const maxTileSize = 15;
     
-    const headerElement = document.querySelector('.game-header');
-    if (!headerElement) return;
-    const headerStyle = window.getComputedStyle(headerElement);
-    const availableWidth = headerElement.clientWidth - parseFloat(headerStyle.paddingLeft) - parseFloat(headerStyle.paddingRight);
-    const availableHeight = headerElement.clientHeight - parseFloat(headerStyle.paddingTop) - parseFloat(headerStyle.paddingBottom);
+    const bodyElement = document.querySelector('.game-body');
+    if (!bodyElement) return;
+    const bodyStyle = window.getComputedStyle(bodyElement);
+    const availableWidth = bodyElement.clientWidth - parseFloat(bodyStyle.paddingLeft) - parseFloat(bodyStyle.paddingRight);
+    const availableHeight = bodyElement.clientHeight - parseFloat(bodyStyle.paddingTop) - parseFloat(bodyStyle.paddingBottom);
     
     TILE_SIZE = Math.min(Math.floor(availableHeight / MAZE_HEIGHT), Math.floor(availableWidth / MAZE_WIDTH));
     TILE_SIZE = Math.max(minTileSize, Math.min(TILE_SIZE, maxTileSize));
@@ -269,22 +269,17 @@ function calculateMaxMazeSize() {
     const availableScreenHeight = window.innerHeight;
     const layoutWidth = availableScreenWidth;
     const layoutHeight = availableScreenHeight - 40;
-    const headerHeight = layoutHeight * 0.75 - 10;
-    const headerWidth = layoutWidth - 10;
+    const bodyHeight = layoutHeight * 0.75 - 10 - 60; // Adjusted for new header
+    const bodyWidth = layoutWidth - 10;
     const MINIMUM_VIABLE_TILE_SIZE = 3;
     
-    let maxWidth = Math.floor(headerWidth / MINIMUM_VIABLE_TILE_SIZE);
-    let maxHeight = Math.floor(headerHeight / MINIMUM_VIABLE_TILE_SIZE);
+    let maxWidth = Math.floor(bodyWidth / MINIMUM_VIABLE_TILE_SIZE);
+    let maxHeight = Math.floor(bodyHeight / MINIMUM_VIABLE_TILE_SIZE);
     
     maxWidth = maxWidth - (maxWidth % STEP) + 1;
     maxHeight = maxHeight - (maxHeight % STEP) + 1;
 
     return { maxWidth, maxHeight };
-}
-
-function calculateAndDisplayMaxMazeSize() {
-    const { maxWidth, maxHeight } = calculateMaxMazeSize();
-    autoFitButton.textContent = `최대 크기 (${maxWidth}x${maxHeight})`;
 }
 
 function showStartScreen() {
@@ -308,20 +303,19 @@ function showStartScreen() {
     nicknameInput.value = '';
     nicknameInput.disabled = false;
     confirmNicknameBtn.disabled = false;
+    confirmNicknameBtn.classList.remove('active-blue');
     createNewGameBtn.disabled = true;
     joinGameBtn.disabled = true;
 
     document.querySelectorAll('.control-mode-button').forEach(btn => btn.style.backgroundColor = '');
     const selectedBtn = document.querySelector(`.control-mode-button[data-mode="${controlMode}"]`);
     if(selectedBtn) selectedBtn.style.backgroundColor = '#4F46E5';
-
-    calculateAndDisplayMaxMazeSize();
 }
 
 function updateLobbyUI(isMaster) {
     mazeWidthSelectLobby.disabled = !isMaster;
     mazeHeightSelectLobby.disabled = !isMaster;
-    autoFitButtonLobby.disabled = !isMaster;
+    randomSizeButtonLobby.disabled = !isMaster;
     
     if (isMaster) {
         readyButton.style.display = 'flex';
@@ -527,7 +521,7 @@ function checkWin() {
             showGameOverModal({
                 clearTime: updateTimerDisplay(),
                 mazeSize: `${MAZE_WIDTH} x ${MAZE_HEIGHT}`,
-                rankings: [{ rank: 1, nickname: '나' }]
+                rankings: [{ rank: 1, nickname: '나', finishTime: updateTimerDisplay() }]
             });
         }
         
@@ -815,7 +809,7 @@ function showGameOverModal(data) {
             <h3 class="text-lg font-bold mb-2">전체 순위</h3>
     `;
     data.rankings.forEach(player => {
-        const isMe = player.id === (socket ? socket.id : 'player1');
+        const isMe = socket ? player.id === socket.id : player.rank === 1;
         rankingHTML += `<p class="text-md ${isMe ? 'font-bold text-blue-600' : ''}">${player.rank}위: ${player.nickname} (${player.finishTime})</p>`;
     });
     rankingHTML += '</div>';
@@ -832,8 +826,11 @@ function showGameOverModal(data) {
     
     document.getElementById('gameOverRestartBtn').addEventListener('click', () => {
         winModal.style.display = 'none';
-        multiplayerChoiceContainer.classList.remove('hidden');
-        lobbyContainer.classList.add('hidden');
+        if (socket) {
+            showStartScreen();
+        } else {
+            initGame();
+        }
     });
     document.getElementById('gameOverSettingsBtn').addEventListener('click', showStartScreen);
     document.getElementById('gameOverScreenshotBtn').addEventListener('click', takeScreenshot);
@@ -920,9 +917,11 @@ function setupEventListeners() {
         customSizeContainer.classList.add('hidden');
         ageButtonsContainer.parentElement.classList.remove('hidden');
     });
-    autoFitButton.addEventListener('click', () => {
-        const { maxWidth, maxHeight } = calculateMaxMazeSize();
-        MAZE_WIDTH = maxWidth; MAZE_HEIGHT = maxHeight;
+    randomSizeButton.addEventListener('click', () => {
+        const sizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
+        const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
+        MAZE_WIDTH = randomSize;
+        MAZE_HEIGHT = randomSize;
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
@@ -941,6 +940,14 @@ function setupEventListeners() {
         backToGameMode.classList.remove('hidden');
     });
 
+    nicknameInput.addEventListener('input', () => {
+        if (nicknameInput.value.trim()) {
+            confirmNicknameBtn.classList.add('active-blue');
+        } else {
+            confirmNicknameBtn.classList.remove('active-blue');
+        }
+    });
+
     confirmNicknameBtn.addEventListener('click', () => {
         const nickname = nicknameInput.value.trim();
         if (nickname) {
@@ -948,6 +955,7 @@ function setupEventListeners() {
             socket.emit('setNickname', { nickname });
             nicknameInput.disabled = true;
             confirmNicknameBtn.disabled = true;
+            confirmNicknameBtn.classList.remove('active-blue');
             createNewGameBtn.disabled = false;
             joinGameBtn.disabled = false;
         } else {
@@ -994,12 +1002,14 @@ function setupEventListeners() {
         socket.emit('leaveRoom');
     });
 
-    autoFitButtonLobby.addEventListener('click', () => {
-        const { maxWidth, maxHeight } = calculateMaxMazeSize();
-        mazeWidthSelectLobby.value = maxWidth;
-        mazeHeightSelectLobby.value = maxHeight;
+    randomSizeButtonLobby.addEventListener('click', () => {
+        const sizes = [43, 49, 55, 61, 67, 73, 79, 85, 91, 97, 103, 109, 115, 121, 127];
+        const randomWidth = sizes[Math.floor(Math.random() * sizes.length)];
+        const randomHeight = sizes[Math.floor(Math.random() * sizes.length)];
+        mazeWidthSelectLobby.value = randomWidth;
+        mazeHeightSelectLobby.value = randomHeight;
         if (playerRole === 'master') {
-            socket.emit('settingsChanged', { width: maxWidth, height: maxHeight });
+            socket.emit('settingsChanged', { width: randomWidth, height: randomHeight });
         }
     });
     
@@ -1098,7 +1108,7 @@ function setupEventListeners() {
         if (mainLayout.style.display === 'flex') { 
             initializeCanvasSize(); 
         } else if (startScreenModal.style.display === 'flex') {
-            calculateAndDisplayMaxMazeSize();
+            // calculateAndDisplayMaxMazeSize(); // This function was removed as per request
         }
     });
 }
