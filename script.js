@@ -90,6 +90,8 @@ const customContentLobby = document.getElementById('customContentLobby');
 const levelSelectLobby = document.getElementById('levelSelectLobby');
 const mazeWidthSelectLobby = document.getElementById('mazeWidthSelectLobby');
 const mazeHeightSelectLobby = document.getElementById('mazeHeightSelectLobby');
+const randomSizeButtonLobby = document.getElementById('randomSizeButtonLobby');
+const lobbyStartButtonContainer = document.getElementById('lobbyStartButtonContainer');
 
 
 // Modals
@@ -309,6 +311,14 @@ function updateMaxSizeLabel() {
     }
 }
 
+function updateMaxSizeLabelLobby() {
+    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+    const maxOption = levelSelectLobby.querySelector('option[value="max"]');
+    if (maxOption) {
+        maxOption.textContent = `전문(Max): ${maxWidth} x ${maxHeight}`;
+    }
+}
+
 function showStartScreen() {
     clearTimeout(moveSoundTimeout);
     if (gallopingSound && !gallopingSound.paused) {
@@ -360,10 +370,14 @@ function updateLobbyUI(isMaster) {
         startLobbyButton.style.display = 'flex';
         startLobbyButton.disabled = true; // 기본적으로 비활성화
         roomInfoContainer.style.display = 'flex';
+        lobbyStartButtonContainer.classList.add('flex-grow');
+        randomSizeButtonLobby.style.display = 'inline-flex';
     } else { // Guest
         readyButton.style.display = 'flex';
         startLobbyButton.style.display = 'none';
         roomInfoContainer.style.display = 'flex';
+        lobbyStartButtonContainer.classList.remove('flex-grow');
+        randomSizeButtonLobby.style.display = 'none';
     }
 }
 
@@ -793,6 +807,9 @@ function setupSocketListeners() {
         selectedCharacter = null;
         readyButton.disabled = true;
 
+        currentRoomId = room.id;
+        roomIdDisplay.textContent = room.id;
+
         // 방장이 설정한 내용으로 UI 업데이트
         setLobbySizeMode(room.settings.mode);
         levelSelectLobby.value = room.settings.preset;
@@ -1126,6 +1143,7 @@ function setupEventListeners() {
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         setLobbySizeMode('preset');
+        updateMaxSizeLabelLobby();
         
         const settings = {
             mode: lobbySizeMode,
@@ -1181,14 +1199,28 @@ function setupEventListeners() {
     
     presetModeBtnLobby.addEventListener('click', () => {
         setLobbySizeMode('preset');
+        randomSizeButtonLobby.classList.remove('active');
         sendLobbySettings();
     });
     customModeBtnLobby.addEventListener('click', () => {
         setLobbySizeMode('custom');
+        randomSizeButtonLobby.classList.remove('active');
         sendLobbySettings();
     });
     [levelSelectLobby, mazeWidthSelectLobby, mazeHeightSelectLobby].forEach(select => {
-        select.addEventListener('change', sendLobbySettings);
+        select.addEventListener('change', () => {
+            if (levelSelectLobby.value !== 'max') {
+                randomSizeButtonLobby.classList.remove('active');
+            }
+            sendLobbySettings();
+        });
+    });
+    randomSizeButtonLobby.addEventListener('click', () => {
+        if (playerRole !== 'master') return;
+        setLobbySizeMode('preset');
+        levelSelectLobby.value = 'max';
+        randomSizeButtonLobby.classList.add('active');
+        sendLobbySettings();
     });
 
 
@@ -1203,9 +1235,16 @@ function setupEventListeners() {
     startLobbyButton.addEventListener('click', () => {
         if (playerRole === 'master' && selectedCharacter) {
             if (lobbySizeMode === 'preset') {
-                const size = parseInt(levelSelectLobby.value);
-                MAZE_WIDTH = size;
-                MAZE_HEIGHT = size;
+                const level = levelSelectLobby.value;
+                if (level === 'max') {
+                    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+                    MAZE_WIDTH = maxWidth;
+                    MAZE_HEIGHT = maxHeight;
+                } else {
+                    const size = parseInt(level);
+                    MAZE_WIDTH = size;
+                    MAZE_HEIGHT = size;
+                }
             } else {
                 MAZE_WIDTH = parseInt(mazeWidthSelectLobby.value);
                 MAZE_HEIGHT = parseInt(mazeHeightSelectLobby.value);
