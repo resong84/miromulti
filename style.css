@@ -323,6 +323,9 @@ canvas {
     white-space: nowrap;
     padding: 8px 16px;
     font-size: 1.0rem;
+    display: inline-flex; /* 수정: flex로 중앙 정렬 */
+    align-items: center; /* 수정: 세로 중앙 정렬 */
+    justify-content: center; /* 수정: 가로 중앙 정렬 */
 }
 .action-button:hover {
     background-color: var(--color-green-pastel-dark);
@@ -528,6 +531,20 @@ canvas {
     transform: translateY(0);
     box-shadow: 0 2px 5px var(--color-shadow);
 }
+.start-button:disabled {
+    background-color: #9ca3af;
+    color: #e5e7eb;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 5px var(--color-shadow);
+}
+.start-button:disabled:hover {
+    background-color: #9ca3af;
+    transform: none;
+}
+#startLobbyButton {
+    font-size: 1.1rem;
+}
 #readyButton {
     font-size: 1.1rem;
     background-color: var(--color-green-pastel);
@@ -638,6 +655,36 @@ canvas {
     100% { opacity: 0; }
 }
 
+/* Character Selection Styles */
+.character-button {
+    width: 40px;
+    height: 40px;
+    font-size: 1.8rem;
+    border: 2px solid transparent;
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--color-bg-light);
+}
+.character-button:hover:not(:disabled) {
+    transform: scale(1.1);
+    border-color: var(--color-blue-pastel);
+}
+.character-button.selected {
+    border-color: var(--color-start-button);
+    background-color: var(--color-blue-pastel);
+    transform: scale(1.1);
+}
+.character-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+    text-decoration: line-through;
+}
+
+
 /* =================================================================== */
 /* 6. Responsive Adjustments */
 /* =================================================================== */
@@ -662,4 +709,5 @@ canvas {
     .main-controls-row { gap: 10px; }
     .rollback-group { width: 100px; height: 50px; }
     #winEmoji { font-size: 4rem; }
+    .character-button { width: 35px; height: 35px; font-size: 1.5rem; }
 }

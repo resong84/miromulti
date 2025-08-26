@@ -27,6 +27,8 @@ let players = {};
 let rooms = {};
 let playerRooms = {};
 
+const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
+
 const updateLobbyState = (roomId) => {
     if (rooms[roomId]) {
         io.to(roomId).emit('lobbyStateUpdate', rooms[roomId]);
@@ -38,7 +40,8 @@ const broadcastRoomList = () => {
         .filter(room => !room.gameStarted)
         .map(room => ({
             id: room.id,
-            playerCount: Object.keys(room.players).length
+            playerCount: Object.keys(room.players).length,
+            maxPlayers: room.maxPlayers // 최대 인원 정보 추가
         }));
     io.emit('roomListUpdate', roomList);
 };
@@ -81,7 +84,7 @@ const endGame = (roomId, timedOut) => {
 io.on('connection', (socket) => {
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
 
-  players[socket.id] = { id: socket.id, x: 0, y: 0, nickname: `Player_${socket.id.substring(0,4)}` };
+  players[socket.id] = { id: socket.id, x: 0, y: 0, nickname: `Player_${socket.id.substring(0,4)}`, character: null };
   
   socket.on('setNickname', ({ nickname }) => {
       if (players[socket.id]) {
@@ -96,11 +99,13 @@ io.on('connection', (socket) => {
 
     rooms[roomId] = {
         id: roomId,
-        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true, nickname: players[socket.id].nickname } },
+        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true, nickname: players[socket.id].nickname, character: null } },
         settings: settings,
         gameStarted: false,
         finishers: [],
         playerCount: 1,
+        maxPlayers: 4, // 최대 인원 설정
+        availableCharacters: [...CHARACTER_LIST],
         timeoutId: null
     };
     console.log(`[진단] 방 생성됨: ${roomId}`);
@@ -112,9 +117,14 @@ io.on('connection', (socket) => {
   socket.on('joinGame', ({ roomId }) => {
     const room = rooms[roomId];
     if (room && !room.gameStarted) {
+        if (room.playerCount >= room.maxPlayers) {
+            socket.emit('joinError', { message: '방이 가득 찼습니다.' });
+            return;
+        }
+
         socket.join(roomId);
         playerRooms[socket.id] = roomId;
-        room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false, nickname: players[socket.id].nickname };
+        room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false, nickname: players[socket.id].nickname, character: null };
         room.playerCount++;
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
@@ -130,10 +140,44 @@ io.on('connection', (socket) => {
     broadcastRoomList();
   });
 
+  socket.on('selectCharacter', ({ character }) => {
+      const roomId = playerRooms[socket.id];
+      const room = rooms[roomId];
+      if (!room) return;
+
+      const player = room.players[socket.id];
+      if (!player) return;
+
+      // 다른 사람이 선택하지 않았고, 유효한 캐릭터인지 확인
+      const isCharacterTaken = Object.values(room.players).some(p => p.character === character);
+      if (!isCharacterTaken && CHARACTER_LIST.includes(character)) {
+          // 기존 캐릭터가 있었다면 다시 선택 가능하도록 풀어줌
+          if (player.character) {
+              room.availableCharacters.push(player.character);
+          }
+          player.character = character;
+          // 새로 선택된 캐릭터는 선택 불가능하도록 제거
+          room.availableCharacters = room.availableCharacters.filter(c => c !== character);
+          
+          // 전역 플레이어 정보에도 업데이트
+          if(players[socket.id]) {
+              players[socket.id].character = character;
+          }
+
+          updateLobbyState(roomId);
+      }
+  });
+
   socket.on('playerReady', ({ isReady }) => {
     const roomId = playerRooms[socket.id];
-    if (rooms[roomId]?.players[socket.id]) {
-        rooms[roomId].players[socket.id].isReady = isReady;
+    const room = rooms[roomId];
+    const player = room?.players[socket.id];
+    if (player) {
+        // 말을 선택해야만 준비 가능
+        if (isReady && !player.character) {
+            return; 
+        }
+        player.isReady = isReady;
         updateLobbyState(roomId);
     }
   });
@@ -153,15 +197,20 @@ io.on('connection', (socket) => {
       const roomId = playerRooms[socket.id];
       const room = rooms[roomId];
       if (room && room.players[socket.id]?.isMaster) {
-          room.mazeData = data;
-          if (Object.values(room.players).every(p => p.isReady)) {
+          // 방장도 캐릭터 선택해야 시작 가능
+          if (!room.players[socket.id].character) return;
+
+          const guests = Object.values(room.players).filter(p => !p.isMaster);
+          if (guests.every(p => p.isReady)) {
               room.gameStarted = true;
               broadcastRoomList();
               io.to(roomId).emit('gameCountdown');
               
               setTimeout(() => {
                   console.log(`[진단] ${roomId} 방 게임 시작!`);
-                  io.to(roomId).emit('gameStartingWithData', room.mazeData);
+                  // 게임 시작 시 플레이어들의 캐릭터 정보도 함께 전달
+                  data.players = room.players;
+                  io.to(roomId).emit('gameStartingWithData', data);
               }, 5000);
           }
       }
@@ -195,7 +244,15 @@ io.on('connection', (socket) => {
   socket.on('playerMovement', (movementData) => {
     const roomId = playerRooms[socket.id];
     if (roomId) {
-        socket.to(roomId).emit('playerMoved', { id: socket.id, ...movementData });
+        // 이동 데이터에 캐릭터 정보 추가
+        const player = players[socket.id];
+        if (player) {
+            socket.to(roomId).emit('playerMoved', { 
+                id: socket.id, 
+                character: player.character,
+                ...movementData 
+            });
+        }
     }
   });
 
@@ -204,7 +261,14 @@ io.on('connection', (socket) => {
     const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     if (room) {
-        const wasMaster = room.players[socket.id]?.isMaster;
+        const disconnectedPlayer = room.players[socket.id];
+        const wasMaster = disconnectedPlayer?.isMaster;
+
+        // 플레이어가 선택했던 캐릭터를 다시 선택 가능하게 만듦
+        if (disconnectedPlayer && disconnectedPlayer.character) {
+            room.availableCharacters.push(disconnectedPlayer.character);
+        }
+
         delete room.players[socket.id];
         room.playerCount--;
 
@@ -214,7 +278,6 @@ io.on('connection', (socket) => {
             console.log(`[진단] ${roomId} 방이 비어서 삭제됨.`);
         } else {
             if (wasMaster) {
-                // 남은 플레이어 중 한 명을 새로운 방장으로 임명 (간단하게 첫 번째 플레이어)
                 const newMasterId = Object.keys(room.players)[0];
                 if(newMasterId) {
                     room.players[newMasterId].isMaster = true;

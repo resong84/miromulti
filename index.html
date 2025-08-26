@@ -102,6 +102,16 @@
                     </div>
                 </div>
 
+                <!-- 말 선택 UI 추가 -->
+                <div class="setting-group">
+                    <div class="flex items-center justify-between gap-2">
+                        <label>말 선택:</label>
+                        <div id="characterSelectContainer" class="flex gap-2 justify-center">
+                            <!-- 캐릭터 버튼은 script.js에서 동적으로 생성됩니다. -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="setting-group">
                     <div class="flex items-center justify-between gap-2">
                         <button id="presetModeBtnLobby" class="action-button">미로 크기</button>
@@ -127,10 +137,10 @@
                 </div>
 
                 <div class="flex gap-2 mt-2">
-                    <button id="randomSizeButtonLobby" class="action-button" style="background-color: #A7C7E7;">랜덤</button>
+                    <button id="backToMultiplayerChoiceButton" class="action-button reset-size-button">돌아가기</button>
                     <div class="relative flex-grow">
-                        <button id="readyButton" class="start-button w-full">준비</button>
-                        <button id="startLobbyButton" class="start-button absolute top-0 left-0 w-full h-full flex items-center justify-center">게임 시작</button>
+                        <button id="startLobbyButton" class="start-button w-full">게임 시작</button>
+                        <button id="readyButton" class="start-button absolute top-0 left-0 w-full h-full flex items-center justify-center" style="background-color: var(--color-green-pastel);">준비</button>
                     </div>
                 </div>
             </div>
