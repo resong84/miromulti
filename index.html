@@ -64,10 +64,18 @@
             </div>
 
             <div id="multiplayerChoiceContainer" class="maze-size-input-group hidden">
-                <label>함께하기:</label>
-                <div class="flex gap-2 justify-center">
-                    <button id="createNewGameBtn" class="action-button">새로운 게임 만들기</button>
-                    <button id="joinGameBtn" class="action-button">게임 참여하기</button>
+                <!-- 닉네임 입력 UI -->
+                <div id="nicknameContainer" class="maze-size-input-group">
+                    <label for="nicknameInput">닉네임 입력:</label>
+                    <div class="flex gap-2 justify-center">
+                        <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" class="maze-size-input input" style="width: 150px; text-align: left; padding-left: 10px;">
+                        <button id="confirmNicknameBtn" class="action-button">확인</button>
+                    </div>
+                </div>
+                <!-- 게임 생성/참여 버튼 -->
+                <div id="multiplayerButtons" class="flex gap-2 justify-center mt-4">
+                    <button id="createNewGameBtn" class="action-button" disabled>새로운 게임 만들기</button>
+                    <button id="joinGameBtn" class="action-button" disabled>게임 참여하기</button>
                 </div>
             </div>
 
@@ -174,10 +182,6 @@
                     </div>
                 </div>
             </div>
-            <!-- 개별 클리어 시 나타나는 오버레이 -->
-            <div id="finishOverlay" class="absolute inset-0 bg-white bg-opacity-30 backdrop-blur-sm flex items-center justify-center hidden">
-                <p id="finishRankText" class="text-5xl font-bold text-gray-800" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"></p>
-            </div>
         </footer>
     </div>
 
@@ -195,17 +199,7 @@
         <div class="help-modal-content">
             <h2 class="help-message-title">미로 찾기 게임 설명</h2>
             <p class="help-message-content">
-                <strong>게임 목표:</strong> 말(플레이어)을 시작 지점(⛩️)에서 도착 지점(🚩)까지 이동시켜 미로를 탈출하세요.<br><br>
-                <strong>조작법:</strong><br>
-                - <strong>키보드 방식:</strong> 키보드의 화살표 키(⬆️⬇️⬅️➡️)를 사용하세요.<br>
-                - <strong>조이스틱 방식:</strong> 화면의 조이스틱을 드래그하여 이동합니다.<br>
-                - <strong>Q 버튼 (시작위치):</strong> 시작 지점으로 즉시 이동합니다. (게임당 1회)<br>
-                - <strong>W 버튼 (동선):</strong> 지나온 길을 표시합니다. (게임당 1회)<br><br>
-                <strong>특수 기능:</strong><br>
-                - <strong>롤백 (1, 2):</strong> 현재 위치를 저장하거나, 저장된 위치로 이동합니다.<br><br>
-                <strong>게임 관리:</strong><br>
-                - <strong>크기 설정:</strong> 시작 화면으로 돌아가 새로운 미로 크기를 설정합니다.<br>
-                - <strong>다시 시작:</strong> 현재 크기로 새로운 미로를 생성하여 재시작합니다.<br>
+                <strong>게임 목표:</strong> ...<br>
             </p>
             <button id="closeHelpModalButton" class="action-button">닫기</button>
         </div>
@@ -218,7 +212,6 @@
         </div>
     </div>
 
-    <!-- Audio Files -->
     <audio id="gallopingSound" src="Galloping Horse Sound.mp3" loop></audio>
     <audio id="spotSaveSound" src="spotloofsave.mp3"></audio>
     <audio id="spotLoadSound" src="spotloofload.mp3"></audio>

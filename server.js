@@ -46,9 +46,13 @@ const broadcastRoomList = () => {
 io.on('connection', (socket) => {
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
 
-  players[socket.id] = { id: socket.id, x: 0, y: 0 };
-  socket.emit('currentPlayers', players);
-  socket.broadcast.emit('newPlayer', players[socket.id]);
+  players[socket.id] = { id: socket.id, x: 0, y: 0, nickname: `Player_${socket.id.substring(0,4)}` };
+  
+  socket.on('setNickname', ({ nickname }) => {
+      if (players[socket.id]) {
+          players[socket.id].nickname = nickname;
+      }
+  });
 
   socket.on('createGame', (settings) => {
     const roomId = uuidv4().substring(0, 6);
@@ -57,7 +61,7 @@ io.on('connection', (socket) => {
 
     rooms[roomId] = {
         id: roomId,
-        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true } },
+        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true, nickname: players[socket.id].nickname } },
         settings: { width: settings.width, height: settings.height },
         gameStarted: false,
         finishers: [],
@@ -74,7 +78,7 @@ io.on('connection', (socket) => {
     if (room && !room.gameStarted) {
         socket.join(roomId);
         playerRooms[socket.id] = roomId;
-        room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false };
+        room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false, nickname: players[socket.id].nickname };
         room.playerCount++;
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
@@ -115,44 +119,38 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('startGame', () => {
-    const roomId = playerRooms[socket.id];
-    const room = rooms[roomId];
-    if (room && room.players[socket.id]?.isMaster) {
-        if (Object.values(room.players).every(p => p.isReady)) {
-            room.gameStarted = true;
-            broadcastRoomList();
-            io.to(roomId).emit('gameCountdown');
-            
-            setTimeout(() => {
-                console.log(`[진단] ${roomId} 방 게임 시작!`);
-                io.to(roomId).emit('gameStartingWithData', room.mazeData);
-            }, 5000);
-        }
-    }
-  });
-
-  // Master가 생성한 미로 데이터를 받아 저장하고 게임 시작을 알림
   socket.on('gameDataReady', (data) => {
       const roomId = playerRooms[socket.id];
       const room = rooms[roomId];
       if (room && room.players[socket.id]?.isMaster) {
-          room.mazeData = data; // 미로 데이터 저장
-          socket.emit('startGame'); // Master 본인에게도 시작 신호 전송
+          room.mazeData = data;
+          if (Object.values(room.players).every(p => p.isReady)) {
+              room.gameStarted = true;
+              broadcastRoomList();
+              io.to(roomId).emit('gameCountdown');
+              
+              setTimeout(() => {
+                  console.log(`[진단] ${roomId} 방 게임 시작!`);
+                  io.to(roomId).emit('gameStartingWithData', room.mazeData);
+              }, 5000);
+          }
       }
   });
 
-  socket.on('playerFinished', () => {
+  socket.on('playerFinished', ({ finishTime }) => {
     const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     if (room && room.gameStarted && !room.finishers.some(p => p.id === socket.id)) {
         const rank = room.finishers.length + 1;
-        room.finishers.push({ id: socket.id, rank });
+        room.finishers.push({ id: socket.id, rank, nickname: players[socket.id].nickname, finishTime });
         
-        socket.emit('youFinished', { rank });
-
         if (room.finishers.length === room.playerCount) {
-            io.to(roomId).emit('gameOver', { rankings: room.finishers });
+            const finalData = {
+                clearTime: room.finishers[0].finishTime, // 1등의 클리어 시간
+                mazeSize: `${room.settings.width} x ${room.settings.height}`,
+                rankings: room.finishers
+            };
+            io.to(roomId).emit('gameOver', finalData);
             delete rooms[roomId];
         }
     }
