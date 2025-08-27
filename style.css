@@ -323,9 +323,9 @@ canvas {
     white-space: nowrap;
     padding: 8px 16px;
     font-size: 1.0rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-flex; /* 수정: flex로 중앙 정렬 */
+    align-items: center; /* 수정: 세로 중앙 정렬 */
+    justify-content: center; /* 수정: 가로 중앙 정렬 */
 }
 .action-button:hover {
     background-color: var(--color-green-pastel-dark);
@@ -428,9 +428,9 @@ canvas {
 }
 
 .message-box {
-    display: none;
+    display: none; /* Hidden by default */
     position: absolute;
-    bottom: 100%;
+    top: 10px; /* Position it inside the footer */
     left: 50%;
     transform: translateX(-50%);
     width: calc(100% - 20px);
@@ -440,7 +440,6 @@ canvas {
     border-radius: var(--radius-medium);
     text-align: center;
     font-size: 0.9rem;
-    margin-bottom: 10px;
     z-index: 100;
 }
 
@@ -474,7 +473,7 @@ canvas {
     height: 40px;
     font-size: 1.5rem;
     cursor: pointer;
-    display: none;
+    display: none; /* Initially hidden */
     justify-content: center;
     align-items: center;
     transition: background-color 0.2s ease, transform 0.1s ease;
@@ -674,7 +673,7 @@ canvas {
     100% { opacity: 0; }
 }
 
-/* Character Selection & Player List Styles */
+/* Character Selection Styles */
 .character-button {
     width: 30px;
     height: 30px;
@@ -704,29 +703,6 @@ canvas {
     cursor: not-allowed;
     opacity: 0.4;
     text-decoration: line-through;
-}
-.player-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 8px;
-    border-bottom: 1px solid #eee;
-}
-.player-list-item:last-child {
-    border-bottom: none;
-}
-.kick-button {
-    background-color: var(--color-red-pastel);
-    color: white;
-    border: none;
-    border-radius: var(--radius-small);
-    padding: 2px 8px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-.kick-button:hover {
-    background-color: var(--color-red-pastel-dark);
 }
 
 /* =================================================================== */

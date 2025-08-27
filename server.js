@@ -1,4 +1,4 @@
-server.js
+// server.js
 
 const express = require('express');
 const http = require('http');
@@ -29,13 +29,6 @@ let playerRooms = {};
 
 const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
 
-const clearForceStartTimer = (roomId) => {
-    if (rooms[roomId] && rooms[roomId].forceStartTimer) {
-        clearTimeout(rooms[roomId].forceStartTimer);
-        rooms[roomId].forceStartTimer = null;
-    }
-};
-
 const updateLobbyState = (roomId) => {
     if (rooms[roomId]) {
         io.to(roomId).emit('lobbyStateUpdate', rooms[roomId]);
@@ -58,11 +51,14 @@ const resetRoomForNewGame = (roomId) => {
     if (!room) return;
 
     console.log(`[진단] ${roomId} 방의 게임 상태를 초기화합니다.`);
+    if (room.forceStartTimer) {
+        clearTimeout(room.forceStartTimer);
+        room.forceStartTimer = null;
+    }
     if (room.timeoutId) {
         clearTimeout(room.timeoutId);
         room.timeoutId = null;
     }
-    clearForceStartTimer(roomId);
     room.gameStarted = false;
     room.finishers = [];
     
@@ -73,6 +69,80 @@ const resetRoomForNewGame = (roomId) => {
     updateLobbyState(roomId);
     broadcastRoomList();
 };
+
+const startGame = (roomId) => {
+    const room = rooms[roomId];
+    if (!room || room.gameStarted) return;
+
+    // 방장이 캐릭터를 선택했는지 최종 확인
+    const master = Object.values(room.players).find(p => p.isMaster);
+    if (!master || !master.character) {
+        console.log(`[진단] 방장이 캐릭터를 선택하지 않아 ${roomId} 게임 시작이 취소되었습니다.`);
+        return;
+    }
+
+    room.gameStarted = true;
+    broadcastRoomList(); // 게임이 시작되었으므로 목록에서 제외
+    io.to(roomId).emit('gameCountdown');
+    
+    setTimeout(() => {
+        console.log(`[진단] ${roomId} 방 게임 시작!`);
+        // 게임 데이터는 클라이언트(방장)가 gameDataReady 이벤트를 통해 전달한 것을 사용해야 함
+        // 자동 시작 시에는 마지막으로 방장이 설정한 데이터가 필요.
+        // 이 예제에서는 gameDataReady가 먼저 호출되었다고 가정.
+        // 실제로는 gameData를 room에 저장해두어야 함.
+        const gameData = room.lastGameData;
+        if (gameData) {
+            gameData.players = room.players;
+            io.to(roomId).emit('gameStartingWithData', gameData);
+        } else {
+            console.error(`${roomId} 방의 게임 데이터가 없어 자동 시작에 실패했습니다.`);
+            // 게임 시작 실패 처리 (예: 로비로 되돌리기)
+        }
+    }, 5000);
+};
+
+const checkAndHandleGameStartConditions = (roomId) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    if (room.forceStartTimer) {
+        clearTimeout(room.forceStartTimer);
+        room.forceStartTimer = null;
+    }
+
+    const guests = Object.values(room.players).filter(p => !p.isMaster);
+    const readyGuestsCount = guests.filter(p => p.isReady).length;
+    const totalGuestsCount = guests.length;
+    const master = Object.values(room.players).find(p => p.isMaster);
+
+    if (totalGuestsCount === 0 || !master || !master.character) {
+        // 게스트가 없거나 방장이 준비되지 않으면 자동 시작 로직을 실행하지 않음
+        return;
+    }
+
+    // Rule 2: 모든 게스트가 준비 완료
+    if (readyGuestsCount === totalGuestsCount) {
+        console.log(`[진단] ${roomId} 방의 모든 게스트가 준비 완료. 5초 후 자동 시작합니다.`);
+        io.to(roomId).emit('forceStartCountdown', { type: 'auto' });
+        room.forceStartTimer = setTimeout(() => {
+            startGame(roomId);
+        }, 5000);
+        return; // Rule 2가 우선순위가 높으므로 여기서 종료
+    }
+
+    // Rule 1: N-1명의 게스트가 준비 완료
+    if (totalGuestsCount > 1 && readyGuestsCount === totalGuestsCount - 1) {
+        console.log(`[진단] ${roomId} 방의 N-1명 게스트가 준비 완료. 5초 후 방장에게 시작 권한을 부여합니다.`);
+        io.to(roomId).emit('forceStartCountdown', { type: 'manual' });
+        room.forceStartTimer = setTimeout(() => {
+            if (rooms[roomId] && !rooms[roomId].gameStarted) { // 5초 후에도 게임이 시작되지 않았다면
+                io.to(master.id).emit('masterCanStart');
+            }
+        }, 5000);
+    }
+};
+
 
 const endGame = (roomId, timedOut) => {
     const room = rooms[roomId];
@@ -106,22 +176,22 @@ const endGame = (roomId, timedOut) => {
     resetRoomForNewGame(roomId);
 };
 
-const handlePlayerLeave = (socketId) => {
-    const roomId = playerRooms[socketId];
+const handlePlayerLeave = (socket) => {
+    const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     if (room) {
-        clearForceStartTimer(roomId);
-        const disconnectedPlayer = room.players[socketId];
+        const disconnectedPlayer = room.players[socket.id];
         const wasMaster = disconnectedPlayer?.isMaster;
 
         if (disconnectedPlayer && disconnectedPlayer.character) {
             room.availableCharacters.push(disconnectedPlayer.character);
         }
 
-        delete room.players[socketId];
+        delete room.players[socket.id];
         room.playerCount--;
 
         if (room.playerCount === 0) {
+            if (room.forceStartTimer) clearTimeout(room.forceStartTimer);
             if (room.timeoutId) clearTimeout(room.timeoutId);
             delete rooms[roomId];
             console.log(`[진단] ${roomId} 방이 비어서 삭제됨.`);
@@ -135,16 +205,18 @@ const handlePlayerLeave = (socketId) => {
             }
 
             if (room.gameStarted && room.playerCount === room.finishers.length) {
-                console.log(`[진단] 플레이어(${socketId}) 퇴장 후, 남은 인원이 모두 완주하여 ${roomId} 게임 종료.`);
+                console.log(`[진단] 플레이어(${socket.id}) 퇴장 후, 남은 인원이 모두 완주하여 ${roomId} 게임 종료.`);
                 endGame(roomId, false);
             } else {
                  updateLobbyState(roomId);
+                 checkAndHandleGameStartConditions(roomId); // 나간 후에도 시작 조건 체크
             }
         }
         broadcastRoomList();
     }
-    delete playerRooms[socketId];
+    delete playerRooms[socket.id];
 };
+
 
 io.on('connection', (socket) => {
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
@@ -172,7 +244,8 @@ io.on('connection', (socket) => {
         maxPlayers: 4,
         availableCharacters: [...CHARACTER_LIST],
         timeoutId: null,
-        forceStartTimer: null
+        forceStartTimer: null,
+        lastGameData: null // 게임 데이터를 저장할 공간
     };
     console.log(`[진단] 방 생성됨: ${roomId}`);
     socket.emit('roomCreated', { roomId });
@@ -203,25 +276,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leaveRoom', () => {
-    handlePlayerLeave(socket.id);
+    handlePlayerLeave(socket);
   });
 
   socket.on('requestRoomList', () => {
     broadcastRoomList();
-  });
-
-  socket.on('kickPlayer', ({ guestId }) => {
-    const roomId = playerRooms[socket.id];
-    const room = rooms[roomId];
-    if (room && room.players[socket.id]?.isMaster && room.players[guestId]) {
-        const targetSocket = io.sockets.sockets.get(guestId);
-        if (targetSocket) {
-            targetSocket.emit('kicked');
-            targetSocket.leave(roomId);
-        }
-        handlePlayerLeave(guestId);
-        console.log(`[진단] ${socket.id}가 ${guestId}를 강제 퇴장시킴.`);
-    }
   });
 
   socket.on('selectCharacter', ({ character }) => {
@@ -245,6 +304,7 @@ io.on('connection', (socket) => {
           }
 
           updateLobbyState(roomId);
+          checkAndHandleGameStartConditions(roomId);
       }
   });
 
@@ -257,30 +317,8 @@ io.on('connection', (socket) => {
             return; 
         }
         player.isReady = isReady;
-        clearForceStartTimer(roomId);
-
-        const guests = Object.values(room.players).filter(p => !p.isMaster);
-        const readyGuests = guests.filter(p => p.isReady);
-        const masterId = Object.keys(room.players).find(id => room.players[id].isMaster);
-
-        if (guests.length > 0 && readyGuests.length === guests.length) {
-            // 2) 모든 게스트가 준비 완료 시 5초 후 자동 시작
-            console.log(`[진단] ${roomId} 방 모든 게스트 준비 완료. 5초 후 자동 시작.`);
-            room.forceStartTimer = setTimeout(() => {
-                if (masterId) {
-                    io.to(masterId).emit('forceStartGame');
-                }
-            }, 5000);
-        } else if (guests.length > 1 && readyGuests.length === guests.length - 1) {
-            // 1) 1명을 제외한 모든 게스트 준비 시 5초 후 방장 시작 버튼 활성화
-            console.log(`[진단] ${roomId} 방 1명 제외 준비 완료. 5초 후 시작 버튼 활성화.`);
-            room.forceStartTimer = setTimeout(() => {
-                if (masterId) {
-                    io.to(masterId).emit('enableMasterStart');
-                }
-            }, 5000);
-        }
         updateLobbyState(roomId);
+        checkAndHandleGameStartConditions(roomId);
     }
   });
 
@@ -288,8 +326,11 @@ io.on('connection', (socket) => {
     const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     if (room && room.players[socket.id]?.isMaster) {
+        if (room.forceStartTimer) {
+            clearTimeout(room.forceStartTimer);
+            room.forceStartTimer = null;
+        }
         room.settings = newSettings;
-        clearForceStartTimer(roomId);
         Object.values(room.players).forEach(player => { player.isReady = false; });
         io.to(roomId).emit('unReadyAllPlayers');
         updateLobbyState(roomId);
@@ -300,20 +341,18 @@ io.on('connection', (socket) => {
       const roomId = playerRooms[socket.id];
       const room = rooms[roomId];
       if (room && room.players[socket.id]?.isMaster) {
-          if (!room.players[socket.id].character) return;
-
+          room.lastGameData = data; // 자동 시작을 위해 게임 데이터 저장
+          
           const guests = Object.values(room.players).filter(p => !p.isMaster);
-          if (guests.every(p => p.isReady)) {
-              clearForceStartTimer(roomId);
-              room.gameStarted = true;
-              broadcastRoomList();
-              io.to(roomId).emit('gameCountdown');
-              
-              setTimeout(() => {
-                  console.log(`[진단] ${roomId} 방 게임 시작!`);
-                  data.players = room.players;
-                  io.to(roomId).emit('gameStartingWithData', data);
-              }, 5000);
+          const allReady = guests.every(p => p.isReady);
+
+          // 모든 게스트가 준비되었거나, N-1명 룰에 의해 시작 버튼이 활성화된 경우에만 시작 가능
+          if (allReady || startLobbyButton.disabled === false) {
+              if (room.forceStartTimer) {
+                  clearTimeout(room.forceStartTimer);
+                  room.forceStartTimer = null;
+              }
+              startGame(roomId);
           }
       }
   });
@@ -359,7 +398,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`[진단] 플레이어 접속 해제: ${socket.id}`);
-    handlePlayerLeave(socket.id);
+    handlePlayerLeave(socket);
     delete players[socket.id];
     io.emit('playerDisconnected', socket.id);
   });
