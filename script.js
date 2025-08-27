@@ -139,7 +139,6 @@ let socket;
 let otherPlayers = {};
 let playerRole = 'guest';
 let playerNickname = '';
-let isReady = false;
 let currentRoomId = null;
 let selectedCharacter = null; // 내가 선택한 캐릭터
 const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
@@ -782,7 +781,7 @@ function updateCharacterSelectionUI(lobbyState) {
             if (playerWithChar.isReady) {
                 button.classList.add('ready');
             }
-            if (selectedCharacter !== char) {
+            if (playerWithChar.id !== socket.id) {
                 button.disabled = true;
             }
         }
@@ -790,16 +789,18 @@ function updateCharacterSelectionUI(lobbyState) {
         characterSelectContainer.appendChild(button);
     });
 
-    if (playerRole === 'guest') {
+    if (playerRole === 'guest' && myPlayer) {
         readyButton.disabled = !selectedCharacter;
-    } else if (playerRole === 'master') {
+        readyButton.textContent = myPlayer.isReady ? '준비 완료!' : '준비';
+        readyButton.style.backgroundColor = myPlayer.isReady ? 'var(--color-blue-pastel)' : 'var(--color-green-pastel)';
+    } else if (playerRole === 'master' && myPlayer) {
         const guests = Object.values(lobbyState.players).filter(p => !p.isMaster);
         const allGuestsReady = guests.length > 0 && guests.every(p => p.isReady);
         
-        if (allGuestsReady && selectedCharacter) {
+        if (allGuestsReady && myPlayer.character) {
             startLobbyButton.disabled = false;
         } else {
-            startLobbyButton.disabled = true;
+            startLobbyButton.disabled = true; 
         }
     }
 }
@@ -820,14 +821,11 @@ function setupSocketListeners() {
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         playerRole = 'guest';
-        isReady = false;
         selectedCharacter = null;
-        readyButton.disabled = true;
-
+        
         currentRoomId = room.id;
         roomIdDisplay.textContent = room.id;
 
-        // 방장이 설정한 내용으로 UI 업데이트
         setLobbySizeMode(room.settings.mode);
         levelSelectLobby.value = room.settings.preset;
         mazeWidthSelectLobby.value = room.settings.width;
@@ -866,16 +864,9 @@ function setupSocketListeners() {
             mazeWidthSelectLobby.value = lobbyState.settings.width;
             mazeHeightSelectLobby.value = lobbyState.settings.height;
         }
-        
         updateCharacterSelectionUI(lobbyState);
     });
     
-    socket.on('unReadyAllPlayers', () => {
-        isReady = false;
-        readyButton.textContent = '준비';
-        readyButton.style.backgroundColor = 'var(--color-green-pastel)';
-    });
-
     socket.on('forceStartCountdown', ({ type }) => {
         console.log(type === 'auto' ? "모든 게스트 준비 완료. 5초 후 자동 시작." : "N-1명 준비 완료. 5초 후 방장 시작 가능.");
     });
@@ -913,7 +904,6 @@ function setupSocketListeners() {
         MAZE_WIDTH = data.mazeSize.width;
         MAZE_HEIGHT = data.mazeSize.height;
 
-        // 다른 플레이어 정보 설정
         otherPlayers = {};
         for(const playerId in data.players) {
             if (playerId !== socket.id) {
@@ -946,7 +936,7 @@ function setupSocketListeners() {
             otherPlayers[playerInfo.id].x = playerInfo.x;
             otherPlayers[playerInfo.id].y = playerInfo.y;
             otherPlayers[playerInfo.id].character = playerInfo.character;
-        } else if (playerInfo.id !== socket.id) { // 혹시 모를 예외 처리
+        } else if (playerInfo.id !== socket.id) {
             otherPlayers[playerInfo.id] = playerInfo;
         }
     });
@@ -1031,12 +1021,8 @@ function resetClientGameState() {
     wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
-    isReady = false;
     
-    // UI elements reset
     [wButton, qButton].forEach(btn => btn.disabled = false);
-    readyButton.textContent = '준비';
-    readyButton.style.backgroundColor = 'var(--color-green-pastel)';
 }
 
 function handleGoToLobbyChoice() {
@@ -1156,7 +1142,6 @@ function setupEventListeners() {
                 controlMode = e.target.dataset.mode;
                 mainLayout.className = `main-layout mode-${controlMode}`;
                 
-                // 모든 컨테이너의 버튼 상태 동기화
                 document.querySelectorAll('.control-mode-button').forEach(btn => btn.classList.remove('active'));
                 document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.classList.add('active'));
             }
@@ -1183,7 +1168,7 @@ function setupEventListeners() {
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
-        player.character = '🐎'; // 싱글플레이 시 기본 캐릭터
+        player.character = '🐎';
         initGame();
     });
 
@@ -1331,10 +1316,7 @@ function setupEventListeners() {
 
     readyButton.addEventListener('click', () => {
         if (!selectedCharacter) return;
-        isReady = !isReady;
-        readyButton.textContent = isReady ? '준비 완료!' : '준비';
-        readyButton.style.backgroundColor = isReady ? 'var(--color-blue-pastel)' : 'var(--color-green-pastel)';
-        socket.emit('playerReady', { isReady });
+        socket.emit('playerReady');
     });
 
     startLobbyButton.addEventListener('click', () => {
@@ -1445,7 +1427,6 @@ function populateSizeDropdowns() {
         mazeHeightSelectLobby.add(new Option(i,i));
     }
     
-    // Set default for custom, ensuring it doesn't exceed max
     const defaultSize = Math.min(127, Math.min(maxWidth, maxHeight));
     mazeWidthSelect.value = defaultSize;
     mazeHeightSelect.value = defaultSize;

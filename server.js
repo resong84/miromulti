@@ -300,15 +300,15 @@ io.on('connection', (socket) => {
       }
   });
 
-  socket.on('playerReady', ({ isReady }) => {
+  socket.on('playerReady', () => {
     const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     const player = room?.players[socket.id];
     if (player) {
-        if (isReady && !player.character) {
+        if (!player.isReady && !player.character) {
             return; 
         }
-        player.isReady = isReady;
+        player.isReady = !player.isReady;
         updateLobbyState(roomId);
         checkAndHandleGameStartConditions(roomId);
     }
@@ -324,7 +324,6 @@ io.on('connection', (socket) => {
         }
         room.settings = newSettings;
         Object.values(room.players).forEach(player => { player.isReady = false; });
-        io.to(roomId).emit('unReadyAllPlayers');
         updateLobbyState(roomId);
     }
   });
