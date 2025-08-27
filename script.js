@@ -391,7 +391,8 @@ async function takeScreenshot() {
     flashOverlay.classList.add('flash-effect');
     setTimeout(() => flashOverlay.classList.remove('flash-effect'), 300);
     try {
-        const canvasElement = await html2canvas(mainLayout);
+        const targetElement = document.getElementById('winModalContent');
+        const canvasElement = await html2canvas(targetElement);
         const imageDataUrl = canvasElement.toDataURL('image/png');
         if (navigator.clipboard && navigator.clipboard.write) {
             const response = await fetch(imageDataUrl);
@@ -981,8 +982,8 @@ function showGameOverModal(data) {
     
     winModalContent.innerHTML = rankingHTML;
     
-    document.getElementById('gameOverSettingsBtn').addEventListener('click', showStartScreen);
-    document.getElementById('gameOverScreenshotBtn').addEventListener('click', takeScreenshot);
+    document.getElementById('gameOverSettingsBtn').onclick = showStartScreen;
+    document.getElementById('gameOverScreenshotBtn').onclick = takeScreenshot;
 
     winModal.style.display = 'flex';
 }
@@ -1328,7 +1329,6 @@ function setupEventListeners() {
     resetSizeButton.addEventListener('click', showStartScreen);
     helpButton.addEventListener('click', () => { helpModal.style.display = 'flex'; });
     closeHelpModalButton.addEventListener('click', () => { helpModal.style.display = 'none'; });
-    screenshotModal.addEventListener('click', takeScreenshot);
     closeScreenshotModalButton.addEventListener('click', () => { screenshotModal.style.display = 'none'; });
     
     soundToggleButton.addEventListener('click', () => {
