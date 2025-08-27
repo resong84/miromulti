@@ -686,6 +686,7 @@ canvas {
     justify-content: center;
     align-items: center;
     background-color: var(--color-bg-light);
+    position: relative;
 }
 .character-button:hover:not(:disabled) {
     transform: scale(1.1);
@@ -704,6 +705,26 @@ canvas {
     opacity: 0.4;
     text-decoration: line-through;
 }
+.character-button .ready-indicator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 1rem;
+    background-color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.character-button.ready .ready-indicator {
+    opacity: 1;
+}
+
 
 /* =================================================================== */
 /* 6. Responsive Adjustments */

@@ -767,6 +767,11 @@ function updateCharacterSelectionUI(lobbyState) {
         button.textContent = char;
         button.dataset.character = char;
 
+        const indicator = document.createElement('span');
+        indicator.className = 'ready-indicator';
+        indicator.textContent = '✅';
+        button.appendChild(indicator);
+
         if (selectedCharacter === char) {
             button.classList.add('selected');
         }
@@ -791,10 +796,10 @@ function updateCharacterSelectionUI(lobbyState) {
         const guests = Object.values(lobbyState.players).filter(p => !p.isMaster);
         const allGuestsReady = guests.length > 0 && guests.every(p => p.isReady);
         
-        if (!allGuestsReady) {
-            startLobbyButton.disabled = true;
+        if (allGuestsReady && selectedCharacter) {
+            startLobbyButton.disabled = false;
         } else {
-            startLobbyButton.disabled = !selectedCharacter;
+            startLobbyButton.disabled = true;
         }
     }
 }
@@ -1333,7 +1338,7 @@ function setupEventListeners() {
     });
 
     startLobbyButton.addEventListener('click', () => {
-        if (playerRole === 'master' && selectedCharacter) {
+        if (playerRole === 'master' && selectedCharacter && !startLobbyButton.disabled) {
             if (lobbySizeMode === 'preset') {
                 const level = levelSelectLobby.value;
                 if (level === 'max') {
