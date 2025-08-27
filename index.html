@@ -138,10 +138,18 @@
                 </div>
 
                 <div class="flex gap-2 mt-2">
+                    <button id="problemReportButton" class="action-button" style="display: none;"><span>❌</span></button>
                     <button id="backToMultiplayerChoiceButton" class="action-button reset-size-button">로비</button>
                     <div id="lobbyStartButtonContainer" class="relative flex-grow">
                         <button id="startLobbyButton" class="start-button w-full">게임 시작</button>
                         <button id="readyButton" class="start-button absolute top-0 left-0 h-full flex items-center justify-center" style="background-color: var(--color-green-pastel);">준비</button>
+                    </div>
+                    <div class="relative">
+                        <button id="resetLobbyButton" class="action-button" style="display: none;">초기화</button>
+                        <div id="resetConfirmationContainer" class="hidden">
+                            <button id="confirmResetBtn" class="action-button">예</button>
+                            <button id="cancelResetBtn" class="action-button">아니오</button>
+                        </div>
                     </div>
                     <button id="randomSizeButtonLobby" class="action-button" style="background-color: #A7C7E7;">랜덤</button>
                 </div>
