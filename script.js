@@ -758,10 +758,6 @@ function stopJoystick() {
 
 function updateCharacterSelectionUI(lobbyState) {
     characterSelectContainer.innerHTML = '';
-    const takenCharacters = Object.values(lobbyState.players)
-        .map(p => p.character)
-        .filter(Boolean);
-
     const myPlayer = lobbyState.players[socket.id];
     selectedCharacter = myPlayer ? myPlayer.character : null;
 
@@ -775,20 +771,31 @@ function updateCharacterSelectionUI(lobbyState) {
             button.classList.add('selected');
         }
 
-        if (takenCharacters.includes(char) && selectedCharacter !== char) {
-            button.disabled = true;
+        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char);
+
+        if (playerWithChar) {
+            if (playerWithChar.isReady) {
+                button.classList.add('ready');
+            }
+            if (selectedCharacter !== char) {
+                button.disabled = true;
+            }
         }
         
         characterSelectContainer.appendChild(button);
     });
 
-    // 준비 버튼 활성화/비활성화 로직
     if (playerRole === 'guest') {
         readyButton.disabled = !selectedCharacter;
     } else if (playerRole === 'master') {
         const guests = Object.values(lobbyState.players).filter(p => !p.isMaster);
         const allGuestsReady = guests.length > 0 && guests.every(p => p.isReady);
-        startLobbyButton.disabled = !selectedCharacter || !allGuestsReady;
+        
+        if (!allGuestsReady) {
+            startLobbyButton.disabled = true;
+        } else {
+            startLobbyButton.disabled = !selectedCharacter;
+        }
     }
 }
 
@@ -862,6 +869,16 @@ function setupSocketListeners() {
         isReady = false;
         readyButton.textContent = '준비';
         readyButton.style.backgroundColor = 'var(--color-green-pastel)';
+    });
+
+    socket.on('forceStartCountdown', ({ type }) => {
+        console.log(type === 'auto' ? "모든 게스트 준비 완료. 5초 후 자동 시작." : "N-1명 준비 완료. 5초 후 방장 시작 가능.");
+    });
+
+    socket.on('masterCanStart', () => {
+        if (playerRole === 'master' && selectedCharacter) {
+            startLobbyButton.disabled = false;
+        }
     });
 
     socket.on('gameCountdown', () => {

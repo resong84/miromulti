@@ -74,31 +74,26 @@ const startGame = (roomId) => {
     const room = rooms[roomId];
     if (!room || room.gameStarted) return;
 
-    // 방장이 캐릭터를 선택했는지 최종 확인
     const master = Object.values(room.players).find(p => p.isMaster);
     if (!master || !master.character) {
         console.log(`[진단] 방장이 캐릭터를 선택하지 않아 ${roomId} 게임 시작이 취소되었습니다.`);
         return;
     }
 
+    const gameData = room.lastGameData;
+    if (!gameData) {
+        console.error(`${roomId} 방의 게임 데이터가 없어 자동 시작에 실패했습니다.`);
+        return;
+    }
+
     room.gameStarted = true;
-    broadcastRoomList(); // 게임이 시작되었으므로 목록에서 제외
+    broadcastRoomList();
     io.to(roomId).emit('gameCountdown');
     
     setTimeout(() => {
         console.log(`[진단] ${roomId} 방 게임 시작!`);
-        // 게임 데이터는 클라이언트(방장)가 gameDataReady 이벤트를 통해 전달한 것을 사용해야 함
-        // 자동 시작 시에는 마지막으로 방장이 설정한 데이터가 필요.
-        // 이 예제에서는 gameDataReady가 먼저 호출되었다고 가정.
-        // 실제로는 gameData를 room에 저장해두어야 함.
-        const gameData = room.lastGameData;
-        if (gameData) {
-            gameData.players = room.players;
-            io.to(roomId).emit('gameStartingWithData', gameData);
-        } else {
-            console.error(`${roomId} 방의 게임 데이터가 없어 자동 시작에 실패했습니다.`);
-            // 게임 시작 실패 처리 (예: 로비로 되돌리기)
-        }
+        gameData.players = room.players;
+        io.to(roomId).emit('gameStartingWithData', gameData);
     }, 5000);
 };
 
@@ -117,26 +112,23 @@ const checkAndHandleGameStartConditions = (roomId) => {
     const master = Object.values(room.players).find(p => p.isMaster);
 
     if (totalGuestsCount === 0 || !master || !master.character) {
-        // 게스트가 없거나 방장이 준비되지 않으면 자동 시작 로직을 실행하지 않음
         return;
     }
 
-    // Rule 2: 모든 게스트가 준비 완료
     if (readyGuestsCount === totalGuestsCount) {
         console.log(`[진단] ${roomId} 방의 모든 게스트가 준비 완료. 5초 후 자동 시작합니다.`);
         io.to(roomId).emit('forceStartCountdown', { type: 'auto' });
         room.forceStartTimer = setTimeout(() => {
             startGame(roomId);
         }, 5000);
-        return; // Rule 2가 우선순위가 높으므로 여기서 종료
+        return;
     }
 
-    // Rule 1: N-1명의 게스트가 준비 완료
     if (totalGuestsCount > 1 && readyGuestsCount === totalGuestsCount - 1) {
         console.log(`[진단] ${roomId} 방의 N-1명 게스트가 준비 완료. 5초 후 방장에게 시작 권한을 부여합니다.`);
         io.to(roomId).emit('forceStartCountdown', { type: 'manual' });
         room.forceStartTimer = setTimeout(() => {
-            if (rooms[roomId] && !rooms[roomId].gameStarted) { // 5초 후에도 게임이 시작되지 않았다면
+            if (rooms[roomId] && !rooms[roomId].gameStarted) {
                 io.to(master.id).emit('masterCanStart');
             }
         }, 5000);
@@ -209,7 +201,7 @@ const handlePlayerLeave = (socket) => {
                 endGame(roomId, false);
             } else {
                  updateLobbyState(roomId);
-                 checkAndHandleGameStartConditions(roomId); // 나간 후에도 시작 조건 체크
+                 checkAndHandleGameStartConditions(roomId);
             }
         }
         broadcastRoomList();
@@ -245,7 +237,7 @@ io.on('connection', (socket) => {
         availableCharacters: [...CHARACTER_LIST],
         timeoutId: null,
         forceStartTimer: null,
-        lastGameData: null // 게임 데이터를 저장할 공간
+        lastGameData: null
     };
     console.log(`[진단] 방 생성됨: ${roomId}`);
     socket.emit('roomCreated', { roomId });
@@ -341,19 +333,13 @@ io.on('connection', (socket) => {
       const roomId = playerRooms[socket.id];
       const room = rooms[roomId];
       if (room && room.players[socket.id]?.isMaster) {
-          room.lastGameData = data; // 자동 시작을 위해 게임 데이터 저장
+          room.lastGameData = data;
           
-          const guests = Object.values(room.players).filter(p => !p.isMaster);
-          const allReady = guests.every(p => p.isReady);
-
-          // 모든 게스트가 준비되었거나, N-1명 룰에 의해 시작 버튼이 활성화된 경우에만 시작 가능
-          if (allReady || startLobbyButton.disabled === false) {
-              if (room.forceStartTimer) {
-                  clearTimeout(room.forceStartTimer);
-                  room.forceStartTimer = null;
-              }
-              startGame(roomId);
+          if (room.forceStartTimer) {
+              clearTimeout(room.forceStartTimer);
+              room.forceStartTimer = null;
           }
+          startGame(roomId);
       }
   });
 
