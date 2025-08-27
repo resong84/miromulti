@@ -328,6 +328,10 @@ function showStartScreen() {
     mainLayout.style.display = 'none';
     [winModal, helpModal, screenshotModal, roomListModal].forEach(modal => modal.style.display = 'none');
     
+    const messageBox = document.getElementById('messageBox');
+    messageBox.innerHTML = '';
+    messageBox.style.display = 'none';
+
     gameModeContainer.classList.remove('hidden');
     singlePlayerContainer.classList.add('hidden');
     multiplayerChoiceContainer.classList.add('hidden');
@@ -927,19 +931,36 @@ function setupSocketListeners() {
 }
 
 function showWaitingModal(finishTime) {
-    let waitingHTML = `
-        <span id="winEmoji" style="animation: none;">🏁</span>
-        <p class="win-message-line">기록: ${finishTime}</p>
-        <p class="win-message-line" style="font-size: 1.2rem; margin-top: 1rem;">다른 플레이어를 기다리는 중...</p>
+    const messageBox = document.getElementById('messageBox');
+    messageBox.innerHTML = `
+        <p><strong>나의 기록: ${finishTime}</strong> - 다른 플레이어를 기다리는 중...</p>
     `;
-    winModalContent.innerHTML = waitingHTML;
-    winModal.style.display = 'flex';
+    messageBox.style.display = 'block';
 }
 
 function showGameOverModal(data) {
+    const messageBox = document.getElementById('messageBox');
+    messageBox.innerHTML = '';
+    messageBox.style.display = 'none';
+
+    let myRecord = null;
+    if (socket) { // Multiplayer
+        myRecord = data.rankings.find(p => p.id === socket.id);
+    } else { // Single player
+        myRecord = data.rankings[0];
+    }
+
+    let myRecordHTML = '';
+    if (myRecord) {
+        const timeText = myRecord.finishTime === 'retire' ? '<span class="text-red-500">Retire</span>' : myRecord.finishTime;
+        myRecordHTML = `<p class="win-message-line">나의 기록: ${timeText}  ${myRecord.rank}등</p>`;
+    } else {
+        myRecordHTML = `<p class="win-message-line">게임 종료!</p>`;
+    }
+
     let rankingHTML = `
         <span id="winEmoji">🎉</span>
-        <p class="win-message-line">1등 기록: ${data.clearTime}</p>
+        ${myRecordHTML}
         <p class="win-message-line">미로 크기: ${data.mazeSize}</p>
         <div class="w-full mt-4 border-t pt-4">
             <h3 class="text-lg font-bold mb-2">전체 순위</h3>
@@ -973,6 +994,10 @@ function startGameplay() {
     clearTimeout(moveSoundTimeout);
     if (gallopingSound) gallopingSound.pause();
 
+    const messageBox = document.getElementById('messageBox');
+    messageBox.innerHTML = '';
+    messageBox.style.display = 'none';
+
     gameWon = false; 
     wButtonUsed = false;
     qButtonUsed = false;
@@ -982,7 +1007,7 @@ function startGameplay() {
     for (let key in savedPositions) savedPositions[key] = null;
 
     [winModal, helpModal, screenshotModal].forEach(modal => {
-        if(modal.id !== 'winModal' || !socket) { // 멀티플레이 시 대기 화면이 떠있을 수 있으므로 winModal은 닫지 않음
+        if(modal.id !== 'winModal' || !socket) { 
             modal.style.display = 'none';
         }
     });
@@ -1199,27 +1224,28 @@ function setupEventListeners() {
     
     presetModeBtnLobby.addEventListener('click', () => {
         setLobbySizeMode('preset');
-        randomSizeButtonLobby.classList.remove('active');
         sendLobbySettings();
     });
     customModeBtnLobby.addEventListener('click', () => {
         setLobbySizeMode('custom');
-        randomSizeButtonLobby.classList.remove('active');
         sendLobbySettings();
     });
     [levelSelectLobby, mazeWidthSelectLobby, mazeHeightSelectLobby].forEach(select => {
-        select.addEventListener('change', () => {
-            if (levelSelectLobby.value !== 'max') {
-                randomSizeButtonLobby.classList.remove('active');
-            }
-            sendLobbySettings();
-        });
+        select.addEventListener('change', sendLobbySettings);
     });
     randomSizeButtonLobby.addEventListener('click', () => {
         if (playerRole !== 'master') return;
-        setLobbySizeMode('preset');
-        levelSelectLobby.value = 'max';
-        randomSizeButtonLobby.classList.add('active');
+        setLobbySizeMode('custom');
+
+        const widthOptions = Array.from(mazeWidthSelectLobby.options);
+        const heightOptions = Array.from(mazeHeightSelectLobby.options);
+
+        const randomWidthOption = widthOptions[Math.floor(Math.random() * widthOptions.length)];
+        const randomHeightOption = heightOptions[Math.floor(Math.random() * heightOptions.length)];
+
+        mazeWidthSelectLobby.value = randomWidthOption.value;
+        mazeHeightSelectLobby.value = randomHeightOption.value;
+
         sendLobbySettings();
     });
 

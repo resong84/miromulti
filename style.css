@@ -427,6 +427,23 @@ canvas {
     visibility: hidden;
 }
 
+.message-box {
+    display: none; /* Hidden by default */
+    position: absolute;
+    bottom: 100%; /* Position it right above the footer's content */
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 20px);
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    border-radius: var(--radius-medium);
+    text-align: center;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    z-index: 100;
+}
+
 /* =================================================================== */
 /* 5. Modals (Start, Win, Help, Screenshot) & Overlays */
 /* =================================================================== */
@@ -659,9 +676,9 @@ canvas {
 
 /* Character Selection Styles */
 .character-button {
-    width: 40px;
-    height: 40px;
-    font-size: 1.8rem;
+    width: 30px;
+    height: 30px;
+    font-size: 1.4rem;
     border: 2px solid transparent;
     border-radius: var(--radius-small);
     cursor: pointer;
@@ -685,13 +702,6 @@ canvas {
     opacity: 0.4;
     text-decoration: line-through;
 }
-
-#randomSizeButtonLobby.active {
-    background-color: var(--color-blue-pastel-darker);
-    transform: translateY(0);
-    box-shadow: 0 2px 4px var(--color-shadow);
-}
-
 
 /* =================================================================== */
 /* 6. Responsive Adjustments */
@@ -717,5 +727,4 @@ canvas {
     .main-controls-row { gap: 10px; }
     .rollback-group { width: 100px; height: 50px; }
     #winEmoji { font-size: 4rem; }
-    .character-button { width: 35px; height: 35px; font-size: 1.5rem; }
 }
