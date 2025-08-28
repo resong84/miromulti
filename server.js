@@ -29,16 +29,6 @@ let playerRooms = {};
 
 const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
 
-const createPlayerObject = (socketId, nickname, isMaster = false) => ({
-    id: socketId,
-    nickname: nickname,
-    isMaster: isMaster,
-    isReady: false,
-    character: null,
-    hasProblem: false,
-});
-
-
 const updateLobbyState = (roomId) => {
     if (rooms[roomId]) {
         io.to(roomId).emit('lobbyStateUpdate', rooms[roomId]);
@@ -74,7 +64,6 @@ const resetRoomForNewGame = (roomId) => {
     
     Object.values(room.players).forEach(player => {
         player.isReady = false;
-        player.hasProblem = false;
     });
 
     updateLobbyState(roomId);
@@ -186,6 +175,10 @@ const handlePlayerLeave = (socket) => {
         const disconnectedPlayer = room.players[socket.id];
         const wasMaster = disconnectedPlayer?.isMaster;
 
+        if (disconnectedPlayer && disconnectedPlayer.character) {
+            room.availableCharacters.push(disconnectedPlayer.character);
+        }
+
         delete room.players[socket.id];
         room.playerCount--;
 
@@ -220,7 +213,7 @@ const handlePlayerLeave = (socket) => {
 io.on('connection', (socket) => {
   console.log(`[진단] 플레이어 접속 성공: ${socket.id}`);
 
-  players[socket.id] = { id: socket.id, nickname: `Player_${socket.id.substring(0,4)}` };
+  players[socket.id] = { id: socket.id, x: 0, y: 0, nickname: `Player_${socket.id.substring(0,4)}`, character: null };
   
   socket.on('setNickname', ({ nickname }) => {
       if (players[socket.id]) {
@@ -235,12 +228,13 @@ io.on('connection', (socket) => {
 
     rooms[roomId] = {
         id: roomId,
-        players: { [socket.id]: createPlayerObject(socket.id, players[socket.id].nickname, true) },
+        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true, nickname: players[socket.id].nickname, character: null } },
         settings: settings,
         gameStarted: false,
         finishers: [],
         playerCount: 1,
         maxPlayers: 4,
+        availableCharacters: [...CHARACTER_LIST],
         timeoutId: null,
         forceStartTimer: null,
         lastGameData: null
@@ -261,7 +255,7 @@ io.on('connection', (socket) => {
 
         socket.join(roomId);
         playerRooms[socket.id] = roomId;
-        room.players[socket.id] = createPlayerObject(socket.id, players[socket.id].nickname, false);
+        room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false, nickname: players[socket.id].nickname, character: null };
         room.playerCount++;
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
@@ -289,11 +283,18 @@ io.on('connection', (socket) => {
       const player = room.players[socket.id];
       if (!player) return;
 
-      const isCharacterTaken = Object.values(room.players).some(p => p.character === character && p.id !== socket.id);
-      
+      const isCharacterTaken = Object.values(room.players).some(p => p.character === character);
       if (!isCharacterTaken && CHARACTER_LIST.includes(character)) {
+          if (player.character) {
+              room.availableCharacters.push(player.character);
+          }
           player.character = character;
-          player.hasProblem = false; // 캐릭터를 바꾸는 행위는 문제가 해결된 것으로 간주
+          room.availableCharacters = room.availableCharacters.filter(c => c !== character);
+          
+          if(players[socket.id]) {
+              players[socket.id].character = character;
+          }
+
           updateLobbyState(roomId);
           checkAndHandleGameStartConditions(roomId);
       }
@@ -303,9 +304,11 @@ io.on('connection', (socket) => {
     const roomId = playerRooms[socket.id];
     const room = rooms[roomId];
     const player = room?.players[socket.id];
-    if (player && player.character) {
+    if (player) {
+        if (!player.isReady && !player.character) {
+            return; 
+        }
         player.isReady = !player.isReady;
-        player.hasProblem = false; // 준비/준비 취소 시 문제 상태 해제
         updateLobbyState(roomId);
         checkAndHandleGameStartConditions(roomId);
     }
@@ -320,37 +323,7 @@ io.on('connection', (socket) => {
             room.forceStartTimer = null;
         }
         room.settings = newSettings;
-        Object.values(room.players).forEach(player => { 
-            player.isReady = false;
-            player.hasProblem = false;
-        });
-        updateLobbyState(roomId);
-    }
-  });
-
-  socket.on('resetLobby', () => {
-    const roomId = playerRooms[socket.id];
-    const room = rooms[roomId];
-    if (room && room.players[socket.id]?.isMaster) {
-        console.log(`[진단] 방장(${socket.id})이 ${roomId} 로비를 초기화합니다.`);
-        Object.values(room.players).forEach(p => {
-            p.isReady = false;
-            p.hasProblem = false;
-        });
-        if (room.forceStartTimer) {
-            clearTimeout(room.forceStartTimer);
-            room.forceStartTimer = null;
-        }
-        updateLobbyState(roomId);
-    }
-  });
-
-  socket.on('reportProblem', () => {
-    const roomId = playerRooms[socket.id];
-    const room = rooms[roomId];
-    const player = room?.players[socket.id];
-    if (player && !player.isMaster) {
-        player.hasProblem = !player.hasProblem;
+        Object.values(room.players).forEach(player => { player.isReady = false; });
         updateLobbyState(roomId);
     }
   });
@@ -396,14 +369,15 @@ io.on('connection', (socket) => {
 
   socket.on('playerMovement', (movementData) => {
     const roomId = playerRooms[socket.id];
-    const player = players[socket.id];
-    const roomPlayer = rooms[roomId]?.players[socket.id];
-    if (roomId && player && roomPlayer) {
-        socket.to(roomId).emit('playerMoved', { 
-            id: socket.id, 
-            character: roomPlayer.character,
-            ...movementData 
-        });
+    if (roomId) {
+        const player = players[socket.id];
+        if (player) {
+            socket.to(roomId).emit('playerMoved', { 
+                id: socket.id, 
+                character: player.character,
+                ...movementData 
+            });
+        }
     }
   });
 

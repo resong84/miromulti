@@ -80,12 +80,6 @@ const roomListModal = document.getElementById('roomListModal');
 const roomListContainer = document.getElementById('roomListContainer');
 const closeRoomListModalButton = document.getElementById('closeRoomListModalButton');
 const characterSelectContainer = document.getElementById('characterSelectContainer'); // 말 선택 컨테이너
-const resetLobbyButton = document.getElementById('resetLobbyButton');
-const resetConfirmationContainer = document.getElementById('resetConfirmationContainer');
-const confirmResetBtn = document.getElementById('confirmResetBtn');
-const cancelResetBtn = document.getElementById('cancelResetBtn');
-const problemReportButton = document.getElementById('problemReportButton');
-
 
 // Lobby UI elements
 const controlModeContainerLobby = document.getElementById('controlModeContainerLobby');
@@ -355,7 +349,7 @@ function showStartScreen() {
     controlMode = 'keyboard';
     document.querySelectorAll('.control-mode-button').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll(`.control-mode-button[data-mode="keyboard"]`).forEach(btn => btn.classList.add('active'));
-    levelSelect.value = '91';
+    levelSelect.value = '43';
     setSinglePlayerSizeMode('preset');
     
     populateSizeDropdowns();
@@ -377,19 +371,16 @@ function updateLobbyUI(isMaster) {
     if (isMaster) {
         readyButton.style.display = 'none';
         startLobbyButton.style.display = 'flex';
+        startLobbyButton.disabled = true; // 기본적으로 비활성화
         roomInfoContainer.style.display = 'flex';
         lobbyStartButtonContainer.classList.add('flex-grow');
         randomSizeButtonLobby.style.display = 'inline-flex';
-        resetLobbyButton.style.display = 'flex';
-        problemReportButton.style.display = 'none';
     } else { // Guest
         readyButton.style.display = 'flex';
         startLobbyButton.style.display = 'none';
         roomInfoContainer.style.display = 'flex';
         lobbyStartButtonContainer.classList.remove('flex-grow');
         randomSizeButtonLobby.style.display = 'none';
-        resetLobbyButton.style.display = 'none';
-        problemReportButton.style.display = 'flex';
     }
 }
 
@@ -767,10 +758,7 @@ function stopJoystick() {
 function updateCharacterSelectionUI(lobbyState) {
     characterSelectContainer.innerHTML = '';
     const myPlayer = lobbyState.players[socket.id];
-    if (!myPlayer) return;
-
-    selectedCharacter = myPlayer.character;
-    playerRole = myPlayer.isMaster ? 'master' : 'guest';
+    selectedCharacter = myPlayer ? myPlayer.character : null;
 
     CHARACTER_LIST.forEach(char => {
         const button = document.createElement('button');
@@ -790,25 +778,30 @@ function updateCharacterSelectionUI(lobbyState) {
         const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char);
 
         if (playerWithChar) {
-            if (playerWithChar.isReady) button.classList.add('ready');
-            if (playerWithChar.hasProblem) button.classList.add('has-problem');
-            if (playerWithChar.id !== socket.id) button.disabled = true;
+            if (playerWithChar.isReady) {
+                button.classList.add('ready');
+            }
+            if (playerWithChar.id !== socket.id) {
+                button.disabled = true;
+            }
         }
         
         characterSelectContainer.appendChild(button);
     });
 
-    // 역할에 따라 버튼 상태 업데이트
-    updateLobbyUI(myPlayer.isMaster);
-
-    if (myPlayer.isMaster) {
-        const guests = Object.values(lobbyState.players).filter(p => !p.isMaster);
-        const allGuestsReady = guests.length > 0 && guests.every(p => p.isReady);
-        startLobbyButton.disabled = !(myPlayer.character && allGuestsReady);
-    } else {
-        readyButton.disabled = !myPlayer.character;
+    if (playerRole === 'guest' && myPlayer) {
+        readyButton.disabled = !selectedCharacter;
         readyButton.textContent = myPlayer.isReady ? '준비 완료!' : '준비';
         readyButton.style.backgroundColor = myPlayer.isReady ? 'var(--color-blue-pastel)' : 'var(--color-green-pastel)';
+    } else if (playerRole === 'master' && myPlayer) {
+        const guests = Object.values(lobbyState.players).filter(p => !p.isMaster);
+        const allGuestsReady = guests.length > 0 && guests.every(p => p.isReady);
+        
+        if (allGuestsReady && myPlayer.character) {
+            startLobbyButton.disabled = false;
+        } else {
+            startLobbyButton.disabled = true; 
+        }
     }
 }
 
@@ -827,6 +820,8 @@ function setupSocketListeners() {
         console.log('방에 성공적으로 참여했습니다.');
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
+        playerRole = 'guest';
+        selectedCharacter = null;
         
         currentRoomId = room.id;
         roomIdDisplay.textContent = room.id;
@@ -836,6 +831,7 @@ function setupSocketListeners() {
         mazeWidthSelectLobby.value = room.settings.width;
         mazeHeightSelectLobby.value = room.settings.height;
 
+        updateLobbyUI(false);
         updateCharacterSelectionUI(room);
     });
 
@@ -862,8 +858,7 @@ function setupSocketListeners() {
     });
 
     socket.on('lobbyStateUpdate', (lobbyState) => {
-        const myPlayer = lobbyState.players[socket.id];
-        if (myPlayer && !myPlayer.isMaster) {
+        if (playerRole === 'guest') {
             setLobbySizeMode(lobbyState.settings.mode);
             levelSelectLobby.value = lobbyState.settings.preset;
             mazeWidthSelectLobby.value = lobbyState.settings.width;
@@ -1350,23 +1345,6 @@ function setupEventListeners() {
                 mazeSize: { width: MAZE_WIDTH, height: MAZE_HEIGHT }
             });
         }
-    });
-
-    resetLobbyButton.addEventListener('click', () => {
-        resetConfirmationContainer.classList.remove('hidden');
-    });
-
-    confirmResetBtn.addEventListener('click', () => {
-        socket.emit('resetLobby');
-        resetConfirmationContainer.classList.add('hidden');
-    });
-
-    cancelResetBtn.addEventListener('click', () => {
-        resetConfirmationContainer.classList.add('hidden');
-    });
-
-    problemReportButton.addEventListener('click', () => {
-        socket.emit('reportProblem');
     });
 
     document.addEventListener('keydown', (e) => {
