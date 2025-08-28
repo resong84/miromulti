@@ -673,6 +673,12 @@ canvas {
     100% { opacity: 0; }
 }
 
+/* Countdown Overlay Style */
+#countdownOverlay {
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
 /* Character Selection Styles */
 .character-button {
     width: 30px;
