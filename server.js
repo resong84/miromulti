@@ -61,9 +61,11 @@ const resetRoomForNewGame = (roomId) => {
     }
     room.gameStarted = false;
     room.finishers = [];
+    room.availableCharacters = [...CHARACTER_LIST]; // 선택 가능 캐릭터 목록 초기화
     
     Object.values(room.players).forEach(player => {
         player.isReady = false;
+        player.character = null; // 각 플레이어의 캐릭터 선택 초기화
     });
 
     updateLobbyState(roomId);
