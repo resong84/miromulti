@@ -46,6 +46,21 @@ const broadcastRoomList = () => {
     io.emit('roomListUpdate', roomList);
 };
 
+const calculateAndBroadcastCommonMaxSize = (roomId) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const playersInRoom = Object.values(room.players);
+    const validPlayers = playersInRoom.filter(p => p.maxWidth != null && p.maxHeight != null);
+
+    if (validPlayers.length === 0) return;
+
+    const commonMaxWidth = Math.min(...validPlayers.map(p => p.maxWidth));
+    const commonMaxHeight = Math.min(...validPlayers.map(p => p.maxHeight));
+
+    io.to(roomId).emit('updateCommonMaxSize', { maxWidth: commonMaxWidth, maxHeight: commonMaxHeight });
+};
+
 const resetRoomForNewGame = (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -180,7 +195,7 @@ const handlePlayerLeave = (socket) => {
         }
 
         delete room.players[socket.id];
-        
+
         if (Object.keys(room.players).length === 0) {
             if (room.forceStartTimer) clearTimeout(room.forceStartTimer);
             if (room.timeoutId) clearTimeout(room.timeoutId);
@@ -201,6 +216,7 @@ const handlePlayerLeave = (socket) => {
             } else {
                  updateLobbyState(roomId);
                  checkAndHandleGameStartConditions(roomId);
+                 calculateAndBroadcastCommonMaxSize(roomId); // 인원 변경 시 재계산
             }
         }
         broadcastRoomList();
@@ -227,7 +243,11 @@ io.on('connection', (socket) => {
 
     rooms[roomId] = {
         id: roomId,
-        players: { [socket.id]: { id: socket.id, isReady: false, isMaster: true, nickname: players[socket.id].nickname, character: null } },
+        players: { [socket.id]: { 
+            id: socket.id, isReady: false, isMaster: true, 
+            nickname: players[socket.id].nickname, character: null,
+            maxWidth: null, maxHeight: null // 플레이어별 최대 크기 저장
+        } },
         settings: settings,
         gameStarted: false,
         finishers: [],
@@ -253,7 +273,11 @@ io.on('connection', (socket) => {
 
         socket.join(roomId);
         playerRooms[socket.id] = roomId;
-        room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false, nickname: players[socket.id].nickname, character: null };
+        room.players[socket.id] = { 
+            id: socket.id, isReady: false, isMaster: false, 
+            nickname: players[socket.id].nickname, character: null,
+            maxWidth: null, maxHeight: null // 플레이어별 최대 크기 저장
+        };
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
         socket.emit('joinSuccess', { room });
@@ -277,6 +301,16 @@ io.on('connection', (socket) => {
             maxPlayers: room.maxPlayers
         }));
     socket.emit('roomListUpdate', roomList);
+  });
+
+  socket.on('reportMaxSize', ({ maxWidth, maxHeight }) => {
+    const roomId = playerRooms[socket.id];
+    const room = rooms[roomId];
+    if (room && room.players[socket.id]) {
+        room.players[socket.id].maxWidth = maxWidth;
+        room.players[socket.id].maxHeight = maxHeight;
+        calculateAndBroadcastCommonMaxSize(roomId);
+    }
   });
 
   socket.on('selectCharacter', ({ character }) => {

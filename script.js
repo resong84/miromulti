@@ -314,8 +314,7 @@ function updateMaxSizeLabel() {
     }
 }
 
-function updateMaxSizeLabelLobby() {
-    const { maxWidth, maxHeight } = calculateMaxMazeSize();
+function updateMaxSizeLabelLobby(maxWidth, maxHeight) {
     const maxOption = levelSelectLobby.querySelector('option[value="max"]');
     if (maxOption) {
         maxOption.textContent = `전문(Max): ${maxWidth} x ${maxHeight}`;
@@ -762,6 +761,13 @@ function stopJoystick() {
 // 7. 게임 초기화 및 이벤트 리스너 설정 (Initialization & Listeners)
 // ===================================================================
 
+function sendMyMaxSize() {
+    if (socket) {
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        socket.emit('reportMaxSize', { maxWidth, maxHeight });
+    }
+}
+
 function updateCharacterSelectionUI(lobbyState) {
     characterSelectContainer.innerHTML = '';
     const myPlayer = lobbyState.players[socket.id];
@@ -821,6 +827,7 @@ function setupSocketListeners() {
         roomIdDisplay.textContent = roomId;
         playerRole = 'master';
         updateLobbyUI(true);
+        sendMyMaxSize(); // 방 생성 후 내 최대 크기 보고
     });
 
     socket.on('joinSuccess', ({ room }) => {
@@ -840,6 +847,7 @@ function setupSocketListeners() {
 
         updateLobbyUI(false);
         updateCharacterSelectionUI(room);
+        sendMyMaxSize(); // 방 참여 후 내 최대 크기 보고
     });
 
     socket.on('joinError', ({ message }) => {
@@ -872,6 +880,10 @@ function setupSocketListeners() {
             mazeHeightSelectLobby.value = lobbyState.settings.height;
         }
         updateCharacterSelectionUI(lobbyState);
+    });
+
+    socket.on('updateCommonMaxSize', ({ maxWidth, maxHeight }) => {
+        updateMaxSizeLabelLobby(maxWidth, maxHeight);
     });
     
     socket.on('forceStartCountdown', ({ type }) => {
@@ -1271,7 +1283,6 @@ function setupEventListeners() {
         multiplayerChoiceContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         setLobbySizeMode('preset');
-        updateMaxSizeLabelLobby();
         
         const settings = {
             mode: lobbySizeMode,
@@ -1363,9 +1374,17 @@ function setupEventListeners() {
             if (lobbySizeMode === 'preset') {
                 const level = levelSelectLobby.value;
                 if (level === 'max') {
-                    const { maxWidth, maxHeight } = calculateMaxMazeSize();
-                    MAZE_WIDTH = maxWidth;
-                    MAZE_HEIGHT = maxHeight;
+                    const maxOptionText = levelSelectLobby.querySelector('option[value="max"]').textContent;
+                    const sizes = maxOptionText.match(/(\d+)\s*x\s*(\d+)/);
+                    if (sizes) {
+                        MAZE_WIDTH = parseInt(sizes[1]);
+                        MAZE_HEIGHT = parseInt(sizes[2]);
+                    } else {
+                        // Fallback if parsing fails
+                        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+                        MAZE_WIDTH = maxWidth;
+                        MAZE_HEIGHT = maxHeight;
+                    }
                 } else {
                     const size = parseInt(level);
                     MAZE_WIDTH = size;
@@ -1447,6 +1466,9 @@ function setupEventListeners() {
         }
         if (singlePlayerContainer.classList.contains('hidden') === false) {
             updateMaxSizeLabel();
+        }
+        if (lobbyContainer.classList.contains('hidden') === false && socket) {
+            sendMyMaxSize();
         }
     });
 }
