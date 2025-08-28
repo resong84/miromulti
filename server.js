@@ -61,11 +61,9 @@ const resetRoomForNewGame = (roomId) => {
     }
     room.gameStarted = false;
     room.finishers = [];
-    room.availableCharacters = [...CHARACTER_LIST]; // 선택 가능 캐릭터 목록 초기화
     
     Object.values(room.players).forEach(player => {
         player.isReady = false;
-        player.character = null; // 각 플레이어의 캐릭터 선택 초기화
     });
 
     updateLobbyState(roomId);
@@ -182,9 +180,8 @@ const handlePlayerLeave = (socket) => {
         }
 
         delete room.players[socket.id];
-        room.playerCount--;
-
-        if (room.playerCount === 0) {
+        
+        if (Object.keys(room.players).length === 0) {
             if (room.forceStartTimer) clearTimeout(room.forceStartTimer);
             if (room.timeoutId) clearTimeout(room.timeoutId);
             delete rooms[roomId];
@@ -198,7 +195,7 @@ const handlePlayerLeave = (socket) => {
                 }
             }
 
-            if (room.gameStarted && room.playerCount === room.finishers.length) {
+            if (room.gameStarted && Object.keys(room.players).length === room.finishers.length) {
                 console.log(`[진단] 플레이어(${socket.id}) 퇴장 후, 남은 인원이 모두 완주하여 ${roomId} 게임 종료.`);
                 endGame(roomId, false);
             } else {
@@ -234,7 +231,6 @@ io.on('connection', (socket) => {
         settings: settings,
         gameStarted: false,
         finishers: [],
-        playerCount: 1,
         maxPlayers: 4,
         availableCharacters: [...CHARACTER_LIST],
         timeoutId: null,
@@ -250,7 +246,7 @@ io.on('connection', (socket) => {
   socket.on('joinGame', ({ roomId }) => {
     const room = rooms[roomId];
     if (room && !room.gameStarted) {
-        if (room.playerCount >= room.maxPlayers) {
+        if (Object.keys(room.players).length >= room.maxPlayers) {
             socket.emit('joinError', { message: '방이 가득 찼습니다.' });
             return;
         }
@@ -258,7 +254,6 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         playerRooms[socket.id] = roomId;
         room.players[socket.id] = { id: socket.id, isReady: false, isMaster: false, nickname: players[socket.id].nickname, character: null };
-        room.playerCount++;
         
         console.log(`[진단] ${socket.id}가 ${roomId} 방에 참여함.`);
         socket.emit('joinSuccess', { room });
@@ -274,7 +269,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('requestRoomList', () => {
-    broadcastRoomList();
+    const roomList = Object.values(rooms)
+        .filter(room => !room.gameStarted)
+        .map(room => ({
+            id: room.id,
+            playerCount: Object.keys(room.players).length,
+            maxPlayers: room.maxPlayers
+        }));
+    socket.emit('roomListUpdate', roomList);
   });
 
   socket.on('selectCharacter', ({ character }) => {
@@ -351,7 +353,7 @@ io.on('connection', (socket) => {
         const rank = room.finishers.length + 1;
         room.finishers.push({ id: socket.id, rank, nickname: players[socket.id].nickname, finishTime });
         
-        if (room.finishers.length === 1 && room.playerCount > 1) {
+        if (room.finishers.length === 1 && Object.keys(room.players).length > 1) {
             console.log(`[진단] ${roomId} 방의 첫번째 플레이어 도착. 20초 카운트다운 시작.`);
             room.timeoutId = setTimeout(() => {
                 console.log(`[진단] ${roomId} 방 20초 시간 초과. 게임을 종료합니다.`);
@@ -359,7 +361,7 @@ io.on('connection', (socket) => {
             }, 20000); 
         }
 
-        if (room.finishers.length === room.playerCount) {
+        if (room.finishers.length === Object.keys(room.players).length) {
              console.log(`[진단] ${roomId} 방의 모든 플레이어 도착. 게임을 종료합니다.`);
             if (room.timeoutId) {
                 clearTimeout(room.timeoutId);

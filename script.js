@@ -158,6 +158,9 @@ let audioContextResumed = false;
 let impactSynth, shutterSynth;
 let isSoundOn = true;
 
+// --- 유틸리티 함수 ---
+const isMobile = () => window.innerWidth <= 768;
+
 // ===================================================================
 // 3. 오디오 모듈 (Audio Module)
 // ===================================================================
@@ -337,6 +340,9 @@ function showStartScreen() {
     multiplayerChoiceContainer.classList.add('hidden');
     lobbyContainer.classList.add('hidden');
     homeButton.style.display = 'none';
+
+    // 헤더 초기화
+    document.querySelector('.game-header').style.display = 'flex';
 
     // 닉네임 UI 초기화
     nicknameInput.value = '';
@@ -906,6 +912,15 @@ function setupSocketListeners() {
         MAZE_WIDTH = data.mazeSize.width;
         MAZE_HEIGHT = data.mazeSize.height;
 
+        const { maxWidth, maxHeight } = calculateMaxMazeSize();
+        const isMax = MAZE_WIDTH === maxWidth && MAZE_HEIGHT === maxHeight;
+        const header = document.querySelector('.game-header');
+        if (isMobile() && isMax) {
+            header.style.display = 'none';
+        } else {
+            header.style.display = 'flex';
+        }
+
         otherPlayers = {};
         for(const playerId in data.players) {
             if (playerId !== socket.id) {
@@ -1161,9 +1176,11 @@ function setupEventListeners() {
     });
 
     startSinglePlayerButton.addEventListener('click', () => {
+        const level = levelSelect.value;
+        const isMax = level === 'max';
+
         if (singlePlayerSizeMode === 'preset') {
-            const level = levelSelect.value;
-            if (level === 'max') {
+            if (isMax) {
                 const { maxWidth, maxHeight } = calculateMaxMazeSize();
                 MAZE_WIDTH = maxWidth;
                 MAZE_HEIGHT = maxHeight;
@@ -1177,8 +1194,15 @@ function setupEventListeners() {
             MAZE_HEIGHT = parseInt(mazeHeightSelect.value);
         }
         
+        const header = document.querySelector('.game-header');
+        if (isMobile() && isMax) {
+            header.style.display = 'none';
+        } else {
+            header.style.display = 'flex';
+        }
+
         isMultiplayer = false;
-        document.querySelector('.game-header').textContent = 'MIRO Single';
+        header.textContent = 'MIRO Single';
 
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
