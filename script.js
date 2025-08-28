@@ -142,6 +142,8 @@ let playerNickname = '';
 let currentRoomId = null;
 let selectedCharacter = null; // 내가 선택한 캐릭터
 const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
+let isSettingsThrottled = false;
+const SETTINGS_THROTTLE_DELAY = 200;
 
 
 // Joystick state
@@ -858,12 +860,18 @@ function setupSocketListeners() {
     });
 
     socket.on('lobbyStateUpdate', (lobbyState) => {
-        if (playerRole === 'guest') {
-            setLobbySizeMode(lobbyState.settings.mode);
-            levelSelectLobby.value = lobbyState.settings.preset;
-            mazeWidthSelectLobby.value = lobbyState.settings.width;
-            mazeHeightSelectLobby.value = lobbyState.settings.height;
+        // 방장/게스트 구분 없이 서버로부터 받은 상태로 UI를 업데이트 (Single Source of Truth)
+        setLobbySizeMode(lobbyState.settings.mode);
+        levelSelectLobby.value = lobbyState.settings.preset;
+        mazeWidthSelectLobby.value = lobbyState.settings.width;
+        mazeHeightSelectLobby.value = lobbyState.settings.height;
+        
+        // 내 역할(방장/게스트)이 바뀌었을 수 있으므로 다시 확인하고 UI 업데이트
+        const myPlayer = lobbyState.players[socket.id];
+        if (myPlayer) {
+            playerRole = myPlayer.isMaster ? 'master' : 'guest';
         }
+        updateLobbyUI(playerRole === 'master');
         updateCharacterSelectionUI(lobbyState);
     });
     
@@ -1086,6 +1094,9 @@ function startGameplay() {
 
     if (socket) {
         socket.emit('playerMovement', { x: player.x, y: player.y });
+        restartButton.style.display = 'none'; // 멀티플레이 시 '다시 시작' 버튼 숨김
+    } else {
+        restartButton.style.display = 'inline-flex'; // 싱글플레이 시 '다시 시작' 버튼 표시
     }
 
     playImpactSound();
@@ -1274,43 +1285,70 @@ function setupEventListeners() {
         }
     });
 
+    // 서버로 설정을 보내는 함수 (쓰로틀링 적용)
     const sendLobbySettings = () => {
-        if (playerRole === 'master') {
-            const settings = {
-                mode: lobbySizeMode,
-                preset: levelSelectLobby.value,
-                width: parseInt(mazeWidthSelectLobby.value),
-                height: parseInt(mazeHeightSelectLobby.value)
-            };
-            socket.emit('settingsChanged', settings);
-        }
+        if (isSettingsThrottled || playerRole !== 'master') return;
+        
+        isSettingsThrottled = true;
+        setTimeout(() => { isSettingsThrottled = false; }, SETTINGS_THROTTLE_DELAY);
+
+        const settings = {
+            mode: lobbySizeMode,
+            preset: levelSelectLobby.value,
+            width: parseInt(mazeWidthSelectLobby.value),
+            height: parseInt(mazeHeightSelectLobby.value)
+        };
+        socket.emit('settingsChanged', settings);
     };
     
     presetModeBtnLobby.addEventListener('click', () => {
-        setLobbySizeMode('preset');
-        sendLobbySettings();
+        if (playerRole !== 'master') return;
+        // UI를 즉시 바꾸지 않고, 서버에 변경 의도만 전송
+        const newMode = 'preset';
+        const settings = {
+            mode: newMode,
+            preset: levelSelectLobby.value,
+            width: parseInt(mazeWidthSelectLobby.value),
+            height: parseInt(mazeHeightSelectLobby.value)
+        };
+        socket.emit('settingsChanged', settings);
     });
     customModeBtnLobby.addEventListener('click', () => {
-        setLobbySizeMode('custom');
-        sendLobbySettings();
+        if (playerRole !== 'master') return;
+         // UI를 즉시 바꾸지 않고, 서버에 변경 의도만 전송
+         const newMode = 'custom';
+         const settings = {
+             mode: newMode,
+             preset: levelSelectLobby.value,
+             width: parseInt(mazeWidthSelectLobby.value),
+             height: parseInt(mazeHeightSelectLobby.value)
+         };
+         socket.emit('settingsChanged', settings);
     });
+
     [levelSelectLobby, mazeWidthSelectLobby, mazeHeightSelectLobby].forEach(select => {
         select.addEventListener('change', sendLobbySettings);
     });
+    
     randomSizeButtonLobby.addEventListener('click', () => {
-        if (playerRole !== 'master') return;
-        setLobbySizeMode('custom');
+        if (playerRole !== 'master' || isSettingsThrottled) return;
 
+        // 랜덤 사이즈를 선택하고 즉시 서버로 전송
         const widthOptions = Array.from(mazeWidthSelectLobby.options);
         const heightOptions = Array.from(mazeHeightSelectLobby.options);
-
         const randomWidthOption = widthOptions[Math.floor(Math.random() * widthOptions.length)];
         const randomHeightOption = heightOptions[Math.floor(Math.random() * heightOptions.length)];
 
-        mazeWidthSelectLobby.value = randomWidthOption.value;
-        mazeHeightSelectLobby.value = randomHeightOption.value;
+        isSettingsThrottled = true;
+        setTimeout(() => { isSettingsThrottled = false; }, SETTINGS_THROTTLE_DELAY);
 
-        sendLobbySettings();
+        const settings = {
+            mode: 'custom', // 랜덤 버튼은 '직접 설정' 모드를 의미
+            preset: levelSelectLobby.value,
+            width: parseInt(randomWidthOption.value),
+            height: parseInt(randomHeightOption.value)
+        };
+        socket.emit('settingsChanged', settings);
     });
 
 
