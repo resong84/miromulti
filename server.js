@@ -1,3 +1,4 @@
+javascript
 // server.js
 
 const express = require('express');
@@ -416,6 +417,28 @@ io.on('connection', (socket) => {
                 ...movementData 
             });
         }
+    }
+  });
+
+  // New Ability Handlers
+  socket.on('useAbilityQ', () => {
+    const roomId = playerRooms[socket.id];
+    if (roomId) {
+        socket.to(roomId).emit('abilityQUsed');
+    }
+  });
+
+  socket.on('useAbilityW', () => {
+    const roomId = playerRooms[socket.id];
+    if (roomId) {
+        socket.to(roomId).emit('abilityWUsed');
+    }
+  });
+
+  socket.on('useAbilityE', () => {
+    const roomId = playerRooms[socket.id];
+    if (roomId) {
+        socket.to(roomId).emit('abilityEUsed');
     }
   });
 

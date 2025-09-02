@@ -169,6 +169,7 @@
         </header>
         <div class="game-body">
             <canvas id="mazeCanvas"></canvas>
+            <div id="mosaicOverlay" class="mosaic-overlay hidden"></div>
         </div>
         <footer class="game-footer relative">
             <div class="game-info-container">
@@ -186,9 +187,10 @@
                             <button id="rollback1" class="rollback-button red"><span class="rollback-num">1</span><span class="rollback-desc">위치저장</span></button>
                             <button id="rollback2" class="rollback-button blue"><span class="rollback-num">2</span><span class="rollback-desc">위치저장</span></button>
                         </div>
-                        <div class="text-actions-row">
-                            <button id="qButton" class="multi-line-action-button"><span class="key-char">Q</span><span class="key-desc">시작위치</span></button>
-                            <button id="wButton" class="multi-line-action-button"><span class="key-char">W</span><span class="key-desc">동선</span></button>
+                        <div class="abilities-row">
+                            <button id="qAbilityButton" class="ability-button"><span class="key-char">Q</span></button>
+                            <button id="wAbilityButton" class="ability-button"><span class="key-char">W</span></button>
+                            <button id="eAbilityButton" class="ability-button"><span class="key-char">E</span></button>
                         </div>
                     </div>
                     <div class="right-control-stack">

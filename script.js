@@ -1,3 +1,4 @@
+javascript
 // ===================================================================
 // 1. 코드 구조 개선: 기능별 그룹화
 // ===================================================================
@@ -29,10 +30,14 @@ const restartButton = document.getElementById('restartButton');
 const resetSizeButton = document.getElementById('resetSizeButton');
 const helpButton = document.getElementById('helpButton');
 const randomSizeButton = document.getElementById('randomSizeButton');
-const qButton = document.getElementById('qButton');
-const wButton = document.getElementById('wButton');
 const soundToggleButton = document.getElementById('soundToggleButton');
 const homeButton = document.getElementById('homeButton');
+
+// Ability Buttons
+const qAbilityButton = document.getElementById('qAbilityButton');
+const wAbilityButton = document.getElementById('wAbilityButton');
+const eAbilityButton = document.getElementById('eAbilityButton');
+
 
 // Rollback Buttons
 const rollbackButtons = {
@@ -94,7 +99,7 @@ const randomSizeButtonLobby = document.getElementById('randomSizeButtonLobby');
 const lobbyStartButtonContainer = document.getElementById('lobbyStartButtonContainer');
 
 
-// Modals
+// Modals & Overlays
 const winModal = document.getElementById('winModal');
 const winModalContent = document.getElementById('winModalContent');
 const helpModal = document.getElementById('helpModal');
@@ -105,6 +110,7 @@ const closeScreenshotModalButton = document.getElementById('closeScreenshotModal
 const flashOverlay = document.getElementById('flashOverlay');
 const countdownOverlay = document.getElementById('countdownOverlay');
 const countdownText = document.getElementById('countdownText');
+const mosaicOverlay = document.getElementById('mosaicOverlay');
 
 
 // --- 전역 게임 상태 ---
@@ -119,12 +125,8 @@ let endPos = { x: 0, y: 0 };
 let startTime;
 let timerInterval;
 let gameWon = false;
-let wButtonUsed = false;
-let qButtonUsed = false;
 let playerPath = [];
 const MAX_PLAYER_PATH = 200;
-let wButtonClearInterval = null;
-let wButtonPathColor = '';
 let animationFrameId;
 let flagAnimationTime = 0;
 let savedPositions = { '1': null, '2': null };
@@ -147,11 +149,8 @@ const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
 
 // Joystick state
 let isJoystickActive = false;
-let joystickInitialTimeout = null;
-let joystickRepeatInterval = null;
+let joystickLoopTimeoutId = null;
 let joystickDx = 0, joystickDy = 0;
-const JOYSTICK_INITIAL_DELAY = 150;
-const JOYSTICK_REPEAT_DELAY = 100;
 
 // Audio state
 let audioContextResumed = false;
@@ -219,11 +218,6 @@ function drawMaze(flagYOffset = 0) {
             ctx.fillStyle = (maze[r][c] === 1) ? wallColor : pathColor;
             ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
-    }
-    
-    if (wButtonUsed && playerPath.length > 0) {
-        ctx.fillStyle = wButtonPathColor;
-        playerPath.forEach(p => ctx.fillRect(p.x * TILE_SIZE, p.y * TILE_SIZE, TILE_SIZE, TILE_SIZE));
     }
     
     ctx.textAlign = 'center'; 
@@ -662,32 +656,6 @@ function saveOrLoadPosition(key) {
     }
 }
 
-function handleQButton() {
-    if (gameWon || qButtonUsed) return;
-    qButtonUsed = true;
-    qButton.disabled = true;
-    playSound(spotSaveSound);
-    player = { ...startPos, character: player.character };
-    playerPath = [{ ...player }];
-}
-
-function handleWButton() {
-    if (gameWon || wButtonUsed) return;
-    wButtonUsed = true;
-    wButton.disabled = true;
-    playSound(pastStepSound);
-    
-    if (wButtonClearInterval) clearInterval(wButtonClearInterval);
-    wButtonClearInterval = setInterval(() => {
-        if (playerPath.length > 1) {
-            playerPath.shift();
-        } else {
-            clearInterval(wButtonClearInterval);
-            wButtonClearInterval = null;
-        }
-    }, 500);
-}
-
 function startContinuousMove(direction) {
     if (gameWon || moveIntervals[direction]) return;
     const moveMap = { 'up': () => movePlayer(0, -1), 'down': () => movePlayer(0, 1), 'left': () => movePlayer(-1, 0), 'right': () => movePlayer(1, 0) };
@@ -723,33 +691,43 @@ function handleJoystickMove(event) {
     joystickDy = dy;
     joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
 }
+
+function joystickLoop() {
+    if (!isJoystickActive) return;
+
+    const maxDist = (joystickBase.offsetWidth / 2) * 0.5;
+    const threshold = 10;
+    const distance = Math.sqrt(joystickDx * joystickDx + joystickDy * joystickDy);
+
+    let delay = 300; // 50% movement delay
+    
+    if (distance > maxDist * 0.5) {
+        delay = 200; // 100% movement delay
+    }
+
+    if (distance > threshold) {
+        if (Math.abs(joystickDx) > Math.abs(joystickDy)) {
+            movePlayer(joystickDx > 0 ? 1 : -1, 0);
+        } else {
+            movePlayer(0, joystickDy > 0 ? 1 : -1);
+        }
+    }
+    
+    joystickLoopTimeoutId = setTimeout(joystickLoop, delay);
+}
+
 function startJoystick(event) {
+    if (isJoystickActive) return;
     isJoystickActive = true;
     joystickKnob.style.backgroundColor = getRandomSolidColor();
-    if (joystickInitialTimeout) clearTimeout(joystickInitialTimeout);
-    if (joystickRepeatInterval) clearInterval(joystickRepeatInterval);
-
-    const executeMove = () => {
-        if (!isJoystickActive) return;
-        const threshold = 10;
-        if (Math.abs(joystickDx) < threshold && Math.abs(joystickDy) < threshold) return;
-        if (Math.abs(joystickDx) > Math.abs(joystickDy)) {
-            if (joystickDx > 0) movePlayer(1, 0); else movePlayer(-1, 0);
-        } else {
-            if (joystickDy > 0) movePlayer(0, 1); else movePlayer(0, -1);
-        }
-    };
-
-    joystickInitialTimeout = setTimeout(() => {
-        executeMove();
-        joystickRepeatInterval = setInterval(executeMove, JOYSTICK_REPEAT_DELAY);
-    }, JOYSTICK_INITIAL_DELAY);
-    handleJoystickMove(event);
+    handleJoystickMove(event); 
+    joystickLoop();
 }
+
 function stopJoystick() {
+    if (!isJoystickActive) return;
     isJoystickActive = false;
-    clearTimeout(joystickInitialTimeout);
-    clearInterval(joystickRepeatInterval);
+    clearTimeout(joystickLoopTimeoutId);
     joystickDx = 0;
     joystickDy = 0;
     joystickKnob.style.transform = 'translate(0, 0)';
@@ -971,6 +949,32 @@ function setupSocketListeners() {
         }
     });
     socket.on('playerDisconnected', (playerId) => delete otherPlayers[playerId]);
+
+    // New Ability Listeners
+    socket.on('abilityQUsed', () => {
+        console.log('Received ability Q, regenerating maze.');
+        generateMaze();
+        placeStartEnd();
+        player = { ...startPos, character: player.character };
+        playerPath = [{ ...player }];
+        playImpactSound();
+    });
+
+    socket.on('abilityWUsed', () => {
+        console.log('Received ability W, resetting position.');
+        player = { ...startPos, character: player.character };
+        playerPath = [{ ...player }];
+        playSound(spotLoadSound);
+    });
+
+    socket.on('abilityEUsed', () => {
+        console.log('Received ability E, showing mosaic.');
+        const duration = (3 + ((MAZE_WIDTH * MAZE_HEIGHT) / (MAZE_WIDTH + MAZE_HEIGHT)) * 0.1) * 1000;
+        mosaicOverlay.classList.remove('hidden');
+        setTimeout(() => {
+            mosaicOverlay.classList.add('hidden');
+        }, duration);
+    });
 }
 
 function showWaitingModal(finishTime) {
@@ -1063,14 +1067,12 @@ function showGameOverModal(data) {
 
 function resetClientGameState() {
     gameWon = false;
-    wButtonUsed = false;
-    qButtonUsed = false;
     if (wButtonClearInterval) clearInterval(wButtonClearInterval);
     wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
     
-    [wButton, qButton].forEach(btn => btn.disabled = false);
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = false);
 }
 
 function handleGoToLobbyChoice() {
@@ -1116,11 +1118,6 @@ function startGameplay() {
     messageBox.style.display = 'none';
 
     gameWon = false; 
-    wButtonUsed = false;
-    qButtonUsed = false;
-    if (wButtonClearInterval) clearInterval(wButtonClearInterval);
-    wButtonClearInterval = null;
-    wButtonPathColor = getRandomTransparentColor();
     for (let key in savedPositions) savedPositions[key] = null;
 
     [winModal, helpModal, screenshotModal].forEach(modal => {
@@ -1128,7 +1125,12 @@ function startGameplay() {
             modal.style.display = 'none';
         }
     });
-    [wButton, qButton].forEach(btn => btn.disabled = false);
+    
+    const isSinglePlayer = !isMultiplayer;
+    qAbilityButton.disabled = isSinglePlayer;
+    wAbilityButton.disabled = isSinglePlayer;
+    eAbilityButton.disabled = isSinglePlayer;
+
     clearInterval(timerInterval);
     
     player = { ...startPos, character: player.character || '🐎' };
@@ -1152,6 +1154,25 @@ function initGame() {
     generateMaze();
     placeStartEnd();
     startGameplay();
+}
+
+function restartMazeOnly() {
+    if (gameWon) return;
+    
+    generateMaze();
+    placeStartEnd();
+
+    player = { ...startPos, character: player.character || '🐎' };
+    playerPath = [{ ...player }];
+    for (let key in savedPositions) savedPositions[key] = null;
+    
+    initializeCanvasSize();
+
+    if (socket) {
+        socket.emit('playerMovement', { x: player.x, y: player.y });
+    }
+
+    playImpactSound();
 }
 
 function setSinglePlayerSizeMode(mode) {
@@ -1423,9 +1444,7 @@ function setupEventListeners() {
         const key = e.key.toLowerCase();
 
         if (['1', '2'].includes(key)) { saveOrLoadPosition(key); return; }
-        if (key === 'q') { handleQButton(); return; }
-        if (key === 'w') { handleWButton(); return; }
-
+        
         switch (e.key) {
             case 'ArrowUp': movePlayer(0, -1); break;
             case 'ArrowDown': movePlayer(0, 1); break;
@@ -1450,13 +1469,30 @@ function setupEventListeners() {
     document.addEventListener('mouseup', stopJoystick);
     document.addEventListener('touchend', stopJoystick);
 
-    [qButton].forEach(btn => btn.addEventListener('click', handleQButton));
-    [wButton].forEach(btn => btn.addEventListener('click', handleWButton));
+    qAbilityButton.addEventListener('click', () => {
+        if (isMultiplayer && socket) {
+            socket.emit('useAbilityQ');
+            qAbilityButton.disabled = true;
+        }
+    });
+    wAbilityButton.addEventListener('click', () => {
+        if (isMultiplayer && socket) {
+            socket.emit('useAbilityW');
+            wAbilityButton.disabled = true;
+        }
+    });
+    eAbilityButton.addEventListener('click', () => {
+        if (isMultiplayer && socket) {
+            socket.emit('useAbilityE');
+            eAbilityButton.disabled = true;
+        }
+    });
+
     for (const key in rollbackButtons) {
         if (rollbackButtons[key]) rollbackButtons[key].addEventListener('click', () => saveOrLoadPosition(key));
     }
     
-    restartButton.addEventListener('click', initGame);
+    restartButton.addEventListener('click', restartMazeOnly);
     resetSizeButton.addEventListener('click', showStartScreen);
     helpButton.addEventListener('click', () => { helpModal.style.display = 'flex'; });
     closeHelpModalButton.addEventListener('click', () => { helpModal.style.display = 'none'; });
