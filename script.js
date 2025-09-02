@@ -1031,17 +1031,30 @@ function showGameOverModal(data) {
         rankingHTML += '</div>';
     }
     
-    rankingHTML += `
-        <div class="win-modal-buttons mt-4">
+    let buttonsHTML = '';
+    if (isMultiplayer) {
+        buttonsHTML = `
             <button id="gameOverLobbyBtn" class="action-button">로비로 돌아가기</button>
             <button id="gameOverPlayAgainBtn" class="action-button" style="background-color: var(--color-green-pastel);">다시 하기</button>
             <button id="gameOverScreenshotBtn" class="action-button">스크린샷</button>
-        </div>
-    `;
+        `;
+    } else { // Single Player
+        buttonsHTML = `
+            <button id="gameOverHomeBtn" class="action-button">미로 생성</button>
+            <button id="gameOverPlayAgainBtn" class="action-button" style="background-color: var(--color-green-pastel);">다시 하기</button>
+            <button id="gameOverScreenshotBtn" class="action-button">스크린샷</button>
+        `;
+    }
+    
+    rankingHTML += `<div class="win-modal-buttons mt-4">${buttonsHTML}</div>`;
     
     winModalContent.innerHTML = rankingHTML;
     
-    document.getElementById('gameOverLobbyBtn').onclick = handleGoToLobbyChoice;
+    if (isMultiplayer) {
+        document.getElementById('gameOverLobbyBtn').onclick = handleGoToLobbyChoice;
+    } else {
+        document.getElementById('gameOverHomeBtn').onclick = showStartScreen;
+    }
     document.getElementById('gameOverPlayAgainBtn').onclick = handlePlayAgain;
     document.getElementById('gameOverScreenshotBtn').onclick = takeScreenshot;
 
