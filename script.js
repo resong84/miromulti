@@ -43,6 +43,8 @@ const rollbackButtons = {
     '1': document.getElementById('rollback1'),
     '2': document.getElementById('rollback2'),
 };
+const returnToStartButton = document.getElementById('returnToStartButton');
+
 
 // Joystick
 const joystickBase = document.getElementById('joystickBase');
@@ -655,6 +657,22 @@ function saveOrLoadPosition(key) {
     }
 }
 
+function returnToStart() {
+    if (gameWon) return;
+    player.x = startPos.x;
+    player.y = startPos.y;
+
+    if (socket) {
+        socket.emit('playerMovement', { x: player.x, y: player.y });
+    }
+
+    playerPath.push({ ...player });
+    if (playerPath.length > MAX_PLAYER_PATH) playerPath.shift();
+    
+    playSound(spotLoadSound);
+}
+
+
 function startContinuousMove(direction) {
     if (gameWon || moveIntervals[direction]) return;
     const moveMap = { 'up': () => movePlayer(0, -1), 'down': () => movePlayer(0, 1), 'left': () => movePlayer(-1, 0), 'right': () => movePlayer(1, 0) };
@@ -1101,7 +1119,7 @@ function handlePlayAgain() {
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
     } else {
-        initGame();
+        startGameplay();
     }
 }
 
@@ -1490,6 +1508,7 @@ function setupEventListeners() {
     for (const key in rollbackButtons) {
         if (rollbackButtons[key]) rollbackButtons[key].addEventListener('click', () => saveOrLoadPosition(key));
     }
+    returnToStartButton.addEventListener('click', returnToStart);
     
     restartButton.addEventListener('click', restartMazeOnly);
     resetSizeButton.addEventListener('click', showStartScreen);
