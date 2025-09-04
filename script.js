@@ -210,7 +210,7 @@ function initializeCanvasSize() {
     canvas.height = MAZE_HEIGHT * TILE_SIZE;
 }
 
-function drawMaze(flagYOffset = 0) {
+function drawMaze(flagYOffset = 0, treasureYOffset = 0) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const wallColor = '#555555';
     const pathColor = '#FFFFFF';
@@ -254,7 +254,7 @@ function drawMaze(flagYOffset = 0) {
     ctx.font = `${TILE_SIZE * 4.0}px Arial`;
     treasureChests.forEach(chest => {
         if (!chest.found) {
-            ctx.fillText('🎁', chest.x * TILE_SIZE + TILE_SIZE / 2, chest.y * TILE_SIZE + TILE_SIZE / 2);
+            ctx.fillText('🎁', chest.x * TILE_SIZE + TILE_SIZE / 2, chest.y * TILE_SIZE + TILE_SIZE / 2 + treasureYOffset);
         }
     });
 
@@ -272,9 +272,9 @@ function drawMaze(flagYOffset = 0) {
 
 function animate() {
     flagAnimationTime += 0.05;
-    const flagYOffset = Math.sin(flagAnimationTime) * (TILE_SIZE * 0.4);
+    const yOffset = Math.sin(flagAnimationTime) * (TILE_SIZE * 0.4);
     
-    drawMaze(flagYOffset);
+    drawMaze(yOffset, yOffset);
     
     animationFrameId = requestAnimationFrame(animate);
 }
@@ -1531,7 +1531,15 @@ function setupEventListeners() {
         if (startScreenModal.style.display !== 'none') return;
         const key = e.key.toLowerCase();
 
-        if (['1', '2'].includes(key)) { saveOrLoadPosition(key); return; }
+        if (['1', '2'].includes(key)) {
+            saveOrLoadPosition(key);
+            return;
+        }
+
+        // Q, W, E 키 입력 처리
+        if (key === 'q') qAbilityButton.click();
+        if (key === 'w') wAbilityButton.click();
+        if (key === 'e') eAbilityButton.click();
         
         switch (e.key) {
             case 'ArrowUp': movePlayer(0, -1); break;
