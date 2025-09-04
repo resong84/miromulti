@@ -61,7 +61,6 @@ const mazeHeightSelect = document.getElementById('mazeHeightSelect');
 const presetModeBtn = document.getElementById('presetModeBtn');
 const presetContent = document.getElementById('presetContent');
 const customContent = document.getElementById('customContent');
-const characterSelectContainerSinglePlayer = document.getElementById('characterSelectContainerSinglePlayer');
 
 
 // --- 추가된 DOM 요소 (멀티플레이) ---
@@ -121,7 +120,7 @@ let MAZE_WIDTH = 11;
 let MAZE_HEIGHT = 11;
 let controlMode = 'keyboard';
 let maze = [];
-let player = { x: 0, y: 0, character: null, isMoving: false }; // 플레이어 객체 수정
+let player = { x: 0, y: 0, character: '🐎' }; // 플레이어 객체에 character 속성 추가
 let startPos = { x: 0, y: 0 };
 let endPos = { x: 0, y: 0 };
 let startTime;
@@ -132,6 +131,7 @@ const MAX_PLAYER_PATH = 200;
 let animationFrameId;
 let flagAnimationTime = 0;
 let savedPositions = { '1': null, '2': null };
+let treasureBoxes = [];
 var moveIntervals = {};
 let moveSoundTimeout = null;
 let singlePlayerSizeMode = 'preset'; // 'preset' or 'custom'
@@ -146,36 +146,7 @@ let playerRole = 'guest';
 let playerNickname = '';
 let currentRoomId = null;
 let selectedCharacter = null; // 내가 선택한 캐릭터
-const CHARACTER_LIST_MULTI = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅']; // 멀티플레이용
-const CHARACTER_LIST_SINGLE = ['쥐', '🐎']; // 싱글플레이용
-
-// 캐릭터 데이터 및 이미지 로딩
-const CHARACTERS = {};
-
-function preloadCharacterImages() {
-    const allCharacters = {
-        '쥐': { type: 'image', standingSrc: 'icon/mouse_standing.jpg', movingSrc: 'icon/mouse_animation.gif' },
-        '🐎': { type: 'emoji', value: '🐎' },
-        '🐇': { type: 'emoji', value: '🐇' },
-        '🐢': { type: 'emoji', value: '🐢' },
-        '🐕': { type: 'emoji', value: '🐕' },
-        '🐈': { type: 'emoji', value: '🐈' },
-        '🐅': { type: 'emoji', value: '🐅' }
-    };
-
-    for (const name in allCharacters) {
-        const data = allCharacters[name];
-        CHARACTERS[name] = { type: data.type };
-        if (data.type === 'image') {
-            CHARACTERS[name].standing = new Image();
-            CHARACTERS[name].standing.src = data.standingSrc;
-            CHARACTERS[name].moving = new Image();
-            CHARACTERS[name].moving.src = data.movingSrc;
-        } else {
-            CHARACTERS[name].value = data.value;
-        }
-    }
-}
+const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
 
 
 // Joystick state
@@ -239,26 +210,6 @@ function initializeCanvasSize() {
     canvas.height = MAZE_HEIGHT * TILE_SIZE;
 }
 
-function drawPlayer(p) {
-    const char = p.character;
-    if (!char) return;
-
-    const centerX = p.x * TILE_SIZE + TILE_SIZE / 2;
-    const centerY = p.y * TILE_SIZE + TILE_SIZE / 2;
-
-    if (char.type === 'image') {
-        const img = p.isMoving ? char.moving : char.standing;
-        const imgSize = TILE_SIZE * 4.5;
-        if (img && img.complete) {
-            ctx.drawImage(img, centerX - imgSize / 2, centerY - imgSize / 2, imgSize, imgSize);
-        }
-    } else { // emoji
-        ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-        ctx.fillText(char.value, centerX, centerY);
-    }
-}
-
-
 function drawMaze(flagYOffset = 0) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const wallColor = '#555555';
@@ -299,17 +250,21 @@ function drawMaze(flagYOffset = 0) {
         }
     }
 
+    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
+    treasureBoxes.forEach(box => {
+        ctx.fillText('🎁', box.x * TILE_SIZE + TILE_SIZE / 2, box.y * TILE_SIZE + TILE_SIZE / 2);
+    });
+
     ctx.globalAlpha = 0.5; // 상대방 캐릭터 투명도 설정
+    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
     for (const id in otherPlayers) {
         const otherPlayer = otherPlayers[id];
-        const char = CHARACTERS[otherPlayer.characterName];
-        if (char) {
-            drawPlayer({ ...otherPlayer, character: char, isMoving: true }); // Assume others are always moving for simplicity
-        }
+        ctx.fillText(otherPlayer.character || '👽', otherPlayer.x * TILE_SIZE + TILE_SIZE / 2, otherPlayer.y * TILE_SIZE + TILE_SIZE / 2);
     }
     ctx.globalAlpha = 1.0; // 원래 투명도로 복구
 
-    drawPlayer(player);
+    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
+    ctx.fillText(player.character, player.x * TILE_SIZE + TILE_SIZE / 2, player.y * TILE_SIZE + TILE_SIZE / 2);
 }
 
 function animate() {
@@ -401,13 +356,10 @@ function showStartScreen() {
     controlMode = 'keyboard';
     document.querySelectorAll('.control-mode-button').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll(`.control-mode-button[data-mode="keyboard"]`).forEach(btn => btn.classList.add('active'));
-    levelSelect.value = '91';
+    levelSelect.value = '43';
     setSinglePlayerSizeMode('preset');
     
     populateSizeDropdowns();
-    populateCharacterSelect(characterSelectContainerSinglePlayer, CHARACTER_LIST_SINGLE, '쥐');
-    player.character = CHARACTERS['쥐'];
-
     const { maxWidth, maxHeight } = calculateMaxMazeSize();
     mazeWidthSelect.value = Math.min(127, maxWidth);
     mazeHeightSelect.value = Math.min(127, maxHeight);
@@ -616,9 +568,30 @@ function placeStartEnd() {
         endPos = pathCells.length > 1 ? pathCells[pathCells.length - 1] : {x:MAZE_WIDTH-1-CENTER_OFFSET, y:MAZE_HEIGHT-1-CENTER_OFFSET};
     }
     
-    player.x = startPos.x;
-    player.y = startPos.y;
+    player = { ...startPos, character: player.character };
     playerPath = [{ ...player }];
+}
+
+function placeTreasureBoxes() {
+    treasureBoxes = [];
+    const validPositions = [];
+    for (let r = 0; r < MAZE_HEIGHT; r++) {
+        for (let c = 0; c < MAZE_WIDTH; c++) {
+            if ((c - CENTER_OFFSET) % STEP === 0 && (r - CENTER_OFFSET) % STEP === 0 && maze[r][c] === 0) {
+                if ((c !== startPos.x || r !== startPos.y) && (c !== endPos.x || r !== endPos.y)) {
+                    validPositions.push({ x: c, y: r });
+                }
+            }
+        }
+    }
+
+    const numBoxes = Math.floor(Math.random() * 3) + 1; // 1 to 3 boxes
+
+    for (let i = 0; i < numBoxes && validPositions.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * validPositions.length);
+        treasureBoxes.push(validPositions[randomIndex]);
+        validPositions.splice(randomIndex, 1); // Ensure boxes don't overlap
+    }
 }
 
 function checkWin() {
@@ -643,7 +616,6 @@ function checkWin() {
         
         clearTimeout(moveSoundTimeout);
         if (gallopingSound) gallopingSound.pause();
-        player.isMoving = false;
         if (isSoundOn && clearSound) {
             clearSound.currentTime = 0;
             clearSound.play();
@@ -660,6 +632,30 @@ function playSound(soundElement) {
     if (isSoundOn && soundElement) {
         soundElement.currentTime = 0;
         soundElement.play();
+    }
+}
+
+function checkTreasure() {
+    const collectedBoxIndex = treasureBoxes.findIndex(box => box.x === player.x && box.y === player.y);
+
+    if (collectedBoxIndex > -1) {
+        const collectedBox = treasureBoxes[collectedBoxIndex];
+        
+        if (qAbilityButton.disabled) {
+            qAbilityButton.disabled = false;
+        } else if (wAbilityButton.disabled) {
+            wAbilityButton.disabled = false;
+        } else if (eAbilityButton.disabled) {
+            eAbilityButton.disabled = false;
+        }
+
+        playSound(spotSaveSound);
+
+        if (isMultiplayer && socket) {
+            socket.emit('treasureCollected', { x: collectedBox.x, y: collectedBox.y });
+        } else {
+            treasureBoxes.splice(collectedBoxIndex, 1);
+        }
     }
 }
 
@@ -681,16 +677,15 @@ function movePlayer(dx, dy) {
         playerPath.push({ ...player });
         if (playerPath.length > MAX_PLAYER_PATH) playerPath.shift();
         
+        checkTreasure();
         checkWin();
         if (isSoundOn && audioContextResumed && gallopingSound) {
             clearTimeout(moveSoundTimeout);
-            player.isMoving = true;
             if (gallopingSound.paused) {
                 gallopingSound.play().catch(e => console.error("Error playing sound:", e));
             }
             moveSoundTimeout = setTimeout(() => {
                 gallopingSound.pause();
-                player.isMoving = false;
             }, 500);
         }
     }
@@ -705,8 +700,7 @@ function saveOrLoadPosition(key) {
         savedPositions[key] = null;
         playSound(spotSaveSound);
     } else if (savedPos) {
-        player.x = savedPos.x;
-        player.y = savedPos.y;
+        player = { ...savedPos, character: player.character };
         savedPositions[key] = null;
         checkWin();
         playSound(spotSaveSound);
@@ -822,63 +816,27 @@ function sendMyMaxSize() {
     }
 }
 
-function populateCharacterSelect(container, characterNameList, defaultCharName) {
-    container.innerHTML = '';
-    
-    characterNameList.forEach(name => {
-        const charData = CHARACTERS[name];
-        const button = document.createElement('button');
-        button.className = 'character-button';
-        button.dataset.character = name;
-
-        if (charData.type === 'image') {
-            const img = document.createElement('img');
-            img.src = charData.standing.src;
-            img.alt = name;
-            button.appendChild(img);
-        } else {
-            button.textContent = charData.value;
-        }
-        
-        if (name === defaultCharName) {
-            button.classList.add('selected');
-        }
-        
-        container.appendChild(button);
-    });
-}
-
-
 function updateCharacterSelectionUI(lobbyState) {
     characterSelectContainer.innerHTML = '';
     const myPlayer = lobbyState.players[socket.id];
     selectedCharacter = myPlayer ? myPlayer.character : null;
 
-    CHARACTER_LIST_MULTI.forEach(charName => {
-        const charData = CHARACTERS[charName];
+    CHARACTER_LIST.forEach(char => {
         const button = document.createElement('button');
         button.className = 'character-button';
-        button.dataset.character = charName;
-
-        if (charData.type === 'image') {
-            const img = document.createElement('img');
-            img.src = charData.standing.src;
-            img.alt = charName;
-            button.appendChild(img);
-        } else {
-            button.textContent = charData.value;
-        }
+        button.textContent = char;
+        button.dataset.character = char;
 
         const indicator = document.createElement('span');
         indicator.className = 'ready-indicator';
         indicator.textContent = '✅';
         button.appendChild(indicator);
 
-        if (selectedCharacter === charName) {
+        if (selectedCharacter === char) {
             button.classList.add('selected');
         }
 
-        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === charName);
+        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char);
 
         if (playerWithChar) {
             if (playerWithChar.isReady) {
@@ -1013,6 +971,7 @@ function setupSocketListeners() {
         endPos = data.endPos;
         MAZE_WIDTH = data.mazeSize.width;
         MAZE_HEIGHT = data.mazeSize.height;
+        treasureBoxes = data.treasureBoxes || [];
 
         const { maxWidth, maxHeight } = calculateMaxMazeSize();
         const isMax = MAZE_WIDTH === maxWidth && MAZE_HEIGHT === maxHeight;
@@ -1030,10 +989,10 @@ function setupSocketListeners() {
                     id: playerId,
                     x: data.startPos.x,
                     y: data.startPos.y,
-                    characterName: data.players[playerId].character
+                    character: data.players[playerId].character
                 };
             } else {
-                player.character = CHARACTERS[data.players[playerId].character];
+                player.character = data.players[playerId].character;
             }
         }
         
@@ -1055,28 +1014,33 @@ function setupSocketListeners() {
         if (otherPlayers[playerInfo.id]) {
             otherPlayers[playerInfo.id].x = playerInfo.x;
             otherPlayers[playerInfo.id].y = playerInfo.y;
-            otherPlayers[playerInfo.id].characterName = playerInfo.character;
+            otherPlayers[playerInfo.id].character = playerInfo.character;
         } else if (playerInfo.id !== socket.id) {
             otherPlayers[playerInfo.id] = playerInfo;
         }
     });
     socket.on('playerDisconnected', (playerId) => delete otherPlayers[playerId]);
 
+    socket.on('boxRemoved', ({ x, y }) => {
+        const boxIndex = treasureBoxes.findIndex(box => box.x === x && box.y === y);
+        if (boxIndex > -1) {
+            treasureBoxes.splice(boxIndex, 1);
+        }
+    });
+
     // New Ability Listeners
     socket.on('abilityQUsed', () => {
         console.log('Received ability Q, regenerating maze.');
         generateMaze();
         placeStartEnd();
-        player.x = startPos.x;
-        player.y = startPos.y;
+        player = { ...startPos, character: player.character };
         playerPath = [{ ...player }];
         playImpactSound();
     });
 
     socket.on('abilityWUsed', () => {
         console.log('Received ability W, resetting position.');
-        player.x = startPos.x;
-        player.y = startPos.y;
+        player = { ...startPos, character: player.character };
         playerPath = [{ ...player }];
         playSound(spotLoadSound);
     });
@@ -1185,8 +1149,9 @@ function resetClientGameState() {
     wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
+    treasureBoxes = [];
     
-    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = false);
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
 }
 
 function handleGoToLobbyChoice() {
@@ -1240,16 +1205,13 @@ function startGameplay() {
         }
     });
     
-    const isSinglePlayer = !isMultiplayer;
-    qAbilityButton.disabled = isSinglePlayer;
-    wAbilityButton.disabled = isSinglePlayer;
-    eAbilityButton.disabled = isSinglePlayer;
+    qAbilityButton.disabled = true;
+    wAbilityButton.disabled = true;
+    eAbilityButton.disabled = true;
 
     clearInterval(timerInterval);
     
-    player.x = startPos.x;
-    player.y = startPos.y;
-    player.isMoving = false;
+    player = { ...startPos, character: player.character || '🐎' };
     playerPath = [{ ...player }];
 
     initializeCanvasSize();
@@ -1269,6 +1231,7 @@ function startGameplay() {
 function initGame() {
     generateMaze();
     placeStartEnd();
+    placeTreasureBoxes();
     startGameplay();
 }
 
@@ -1277,9 +1240,9 @@ function restartMazeOnly() {
     
     generateMaze();
     placeStartEnd();
+    placeTreasureBoxes();
 
-    player.x = startPos.x;
-    player.y = startPos.y;
+    player = { ...startPos, character: player.character || '🐎' };
     playerPath = [{ ...player }];
     for (let key in savedPositions) savedPositions[key] = null;
     
@@ -1316,7 +1279,7 @@ function setLobbySizeMode(mode) {
         presetModeBtnLobby.classList.add('active');
         customModeBtnLobby.classList.remove('active');
     } else { // 'custom'
-        presetContentLobby.add('disabled-content');
+        presetContentLobby.classList.add('disabled-content');
         customContentLobby.classList.remove('disabled-content');
         presetModeBtnLobby.classList.remove('active');
         customModeBtnLobby.classList.add('active');
@@ -1336,18 +1299,6 @@ function setupEventListeners() {
                 document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.classList.add('active'));
             }
         });
-    });
-
-    characterSelectContainerSinglePlayer.addEventListener('click', (e) => {
-        const button = e.target.closest('.character-button');
-        if (button) {
-            const charName = button.dataset.character;
-            player.character = CHARACTERS[charName];
-            
-            // Update selection visual
-            characterSelectContainerSinglePlayer.querySelectorAll('.character-button').forEach(btn => btn.classList.remove('selected'));
-            button.classList.add('selected');
-        }
     });
 
     startSinglePlayerButton.addEventListener('click', () => {
@@ -1382,11 +1333,7 @@ function setupEventListeners() {
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
-        
-        if (!player.character) { // If no character was selected, default to the first one
-            player.character = CHARACTERS[CHARACTER_LIST_SINGLE[0]];
-        }
-        
+        player.character = '🐎';
         initGame();
     });
 
@@ -1683,7 +1630,6 @@ document.addEventListener('DOMContentLoaded', () => {
         CanvasRenderingContext2D.prototype.roundRect=function(t,e,o,i,n){return o<2*n&&(n=o/2),i<2*n&&(n=i/2),this.beginPath(),this.moveTo(t+n,e),this.arcTo(t+o,e,t+o,e+i,n),this.arcTo(t+o,e+i,t,e+i,n),this.arcTo(t,e+i,t,e,n),this.arcTo(t,e,t+o,e,n),this.closePath(),this}
     }
     
-    preloadCharacterImages();
     setupEventListeners();
     initAudio();
     showStartScreen();

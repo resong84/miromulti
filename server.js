@@ -2,23 +2,15 @@
 
 const express = require('express');
 const http = require('http');
-const path = require('path'); // path 모듈 추가
 const { Server } = require("socket.io");
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
-// CORS 설정 (기존 코드 유지)
 app.use(cors({
   origin: "https://miromulti.pages.dev" 
 }));
-
-// 정적 파일 제공을 위한 미들웨어 추가
-// __dirname은 현재 실행 중인 server.js 파일이 위치한 디렉토리 경로입니다.
-// 이 코드는 프로젝트 루트 폴더의 모든 파일을 정적 파일로 제공하도록 설정합니다.
-app.use(express.static(path.join(__dirname)));
-
 
 const server = http.createServer(app);
 
@@ -35,7 +27,35 @@ let players = {};
 let rooms = {};
 let playerRooms = {};
 
-const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅', '쥐']; // 서버 캐릭터 리스트에 '쥐' 추가
+const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
+
+const generateTreasureBoxes = (maze, mazeWidth, mazeHeight, startPos, endPos) => {
+    const PATH_SIZE = 5;
+    const WALL_SIZE = 1;
+    const STEP = PATH_SIZE + WALL_SIZE;
+    const CENTER_OFFSET = WALL_SIZE + Math.floor(PATH_SIZE / 2);
+
+    const treasureBoxes = [];
+    const validPositions = [];
+    for (let r = 0; r < mazeHeight; r++) {
+        for (let c = 0; c < mazeWidth; c++) {
+            if ((c - CENTER_OFFSET) % STEP === 0 && (r - CENTER_OFFSET) % STEP === 0 && maze[r][c] === 0) {
+                 if ((c !== startPos.x || r !== startPos.y) && (c !== endPos.x || r !== endPos.y)) {
+                    validPositions.push({ x: c, y: r });
+                }
+            }
+        }
+    }
+
+    const numBoxes = Math.floor(Math.random() * 3) + 1; // 1 to 3 boxes
+
+    for (let i = 0; i < numBoxes && validPositions.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * validPositions.length);
+        treasureBoxes.push(validPositions[randomIndex]);
+        validPositions.splice(randomIndex, 1);
+    }
+    return treasureBoxes;
+};
 
 const updateLobbyState = (roomId) => {
     if (rooms[roomId]) {
@@ -378,6 +398,7 @@ io.on('connection', (socket) => {
       const roomId = playerRooms[socket.id];
       const room = rooms[roomId];
       if (room && room.players[socket.id]?.isMaster) {
+          data.treasureBoxes = generateTreasureBoxes(data.maze, data.mazeSize.width, data.mazeSize.height, data.startPos, data.endPos);
           room.lastGameData = data;
           
           if (room.forceStartTimer) {
@@ -425,6 +446,18 @@ io.on('connection', (socket) => {
             });
         }
     }
+  });
+  
+  socket.on('treasureCollected', ({ x, y }) => {
+      const roomId = playerRooms[socket.id];
+      const room = rooms[roomId];
+      if (room && room.lastGameData && room.lastGameData.treasureBoxes) {
+          const boxIndex = room.lastGameData.treasureBoxes.findIndex(box => box.x === x && box.y === y);
+          if (boxIndex > -1) {
+              room.lastGameData.treasureBoxes.splice(boxIndex, 1);
+              io.to(roomId).emit('boxRemoved', { x, y });
+          }
+      }
   });
 
   // New Ability Handlers
