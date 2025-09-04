@@ -687,11 +687,21 @@ canvas {
 .mosaic-overlay {
     position: absolute;
     top: 2px; left: 2px; right: 2px; bottom: 2px;
-    background-color: rgba(20, 20, 20, 0.9);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     z-index: 50;
     border-radius: var(--radius-small);
+    background-size: 20px 20px; /* Define a size for the patterns */
+}
+.mosaic-pattern-1 {
+    background-image: repeating-linear-gradient(45deg, 
+        rgba(0,0,0,0.3) 0, 
+        rgba(0,0,0,0.3) 10px, 
+        rgba(255,255,255,0.3) 10px, 
+        rgba(255,255,255,0.3) 20px);
+}
+.mosaic-pattern-2 {
+    background-image: repeating-conic-gradient(
+        rgba(0,0,0,0.3) 0% 25%, 
+        rgba(255,255,255,0.3) 0% 50%);
 }
 .hidden {
     display: none !important;

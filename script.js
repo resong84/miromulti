@@ -137,6 +137,7 @@ let singlePlayerSizeMode = 'preset'; // 'preset' or 'custom'
 let isMultiplayer = false; // 추가: 게임 모드 상태 변수
 let lobbySizeMode = 'preset';
 let treasureChests = []; // 보물상자 위치 저장 배열
+let mosaicInterval = null; // 모자이크 효과 인터벌 ID
 
 
 // 멀티플레이어 상태
@@ -605,12 +606,12 @@ function checkTreasureChestCollision() {
     if (chest) {
         chest.found = true;
         
-        // 비활성화된 능력 버튼 찾기
         const disabledButtons = [qAbilityButton, wAbilityButton, eAbilityButton].filter(btn => btn.disabled);
         
         if (disabledButtons.length > 0) {
-            // 비활성화된 버튼 중 하나를 활성화
-            disabledButtons[0].disabled = false;
+            // 비활성화된 버튼 중 하나를 랜덤으로 활성화
+            const randomIndex = Math.floor(Math.random() * disabledButtons.length);
+            disabledButtons[randomIndex].disabled = false;
         }
         
         // (선택) 보물상자 획득 사운드 재생
@@ -1041,10 +1042,24 @@ function setupSocketListeners() {
 
     socket.on('abilityEUsed', () => {
         console.log('Received ability E, showing mosaic.');
+        if (mosaicInterval) clearInterval(mosaicInterval); // 기존 인터벌 정리
+
         const duration = (3 + ((MAZE_WIDTH * MAZE_HEIGHT) / (MAZE_WIDTH + MAZE_HEIGHT)) * 0.1) * 1000;
+        
         mosaicOverlay.classList.remove('hidden');
+        mosaicOverlay.classList.add('mosaic-pattern-1'); // 패턴 1로 시작
+
+        mosaicInterval = setInterval(() => {
+            mosaicOverlay.classList.toggle('mosaic-pattern-1');
+            mosaicOverlay.classList.toggle('mosaic-pattern-2');
+        }, 500);
+
         setTimeout(() => {
+            clearInterval(mosaicInterval);
+            mosaicInterval = null;
             mosaicOverlay.classList.add('hidden');
+            // 클래스 정리
+            mosaicOverlay.classList.remove('mosaic-pattern-1', 'mosaic-pattern-2');
         }, duration);
     });
 }
@@ -1566,19 +1581,19 @@ function setupEventListeners() {
     document.addEventListener('touchend', stopJoystick);
 
     qAbilityButton.addEventListener('click', () => {
-        if (isMultiplayer && socket) {
+        if (isMultiplayer && socket && !qAbilityButton.disabled) {
             socket.emit('useAbilityQ');
             qAbilityButton.disabled = true;
         }
     });
     wAbilityButton.addEventListener('click', () => {
-        if (isMultiplayer && socket) {
+        if (isMultiplayer && socket && !wAbilityButton.disabled) {
             socket.emit('useAbilityW');
             wAbilityButton.disabled = true;
         }
     });
     eAbilityButton.addEventListener('click', () => {
-        if (isMultiplayer && socket) {
+        if (isMultiplayer && socket && !eAbilityButton.disabled) {
             socket.emit('useAbilityE');
             eAbilityButton.disabled = true;
         }
