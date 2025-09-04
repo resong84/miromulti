@@ -131,12 +131,12 @@ const MAX_PLAYER_PATH = 200;
 let animationFrameId;
 let flagAnimationTime = 0;
 let savedPositions = { '1': null, '2': null };
-let treasureBoxes = [];
 var moveIntervals = {};
 let moveSoundTimeout = null;
 let singlePlayerSizeMode = 'preset'; // 'preset' or 'custom'
 let isMultiplayer = false; // 추가: 게임 모드 상태 변수
 let lobbySizeMode = 'preset';
+let treasureChests = []; // 보물상자 위치 저장 배열
 
 
 // 멀티플레이어 상태
@@ -250,9 +250,12 @@ function drawMaze(flagYOffset = 0) {
         }
     }
 
+    // 보물상자 그리기
     ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-    treasureBoxes.forEach(box => {
-        ctx.fillText('🎁', box.x * TILE_SIZE + TILE_SIZE / 2, box.y * TILE_SIZE + TILE_SIZE / 2);
+    treasureChests.forEach(chest => {
+        if (!chest.found) {
+            ctx.fillText('🎁', chest.x * TILE_SIZE + TILE_SIZE / 2, chest.y * TILE_SIZE + TILE_SIZE / 2);
+        }
     });
 
     ctx.globalAlpha = 0.5; // 상대방 캐릭터 투명도 설정
@@ -572,12 +575,14 @@ function placeStartEnd() {
     playerPath = [{ ...player }];
 }
 
-function placeTreasureBoxes() {
-    treasureBoxes = [];
+function generateTreasureChests() {
+    treasureChests = [];
     const validPositions = [];
     for (let r = 0; r < MAZE_HEIGHT; r++) {
         for (let c = 0; c < MAZE_WIDTH; c++) {
+            // 길의 중앙에만 배치
             if ((c - CENTER_OFFSET) % STEP === 0 && (r - CENTER_OFFSET) % STEP === 0 && maze[r][c] === 0) {
+                // 시작점과 도착점은 제외
                 if ((c !== startPos.x || r !== startPos.y) && (c !== endPos.x || r !== endPos.y)) {
                     validPositions.push({ x: c, y: r });
                 }
@@ -585,14 +590,34 @@ function placeTreasureBoxes() {
         }
     }
 
-    const numBoxes = Math.floor(Math.random() * 3) + 1; // 1 to 3 boxes
+    const chestCount = Math.floor(Math.random() * 3) + 1; // 1~3개의 보물상자
 
-    for (let i = 0; i < numBoxes && validPositions.length > 0; i++) {
+    for (let i = 0; i < chestCount; i++) {
+        if (validPositions.length === 0) break;
         const randomIndex = Math.floor(Math.random() * validPositions.length);
-        treasureBoxes.push(validPositions[randomIndex]);
-        validPositions.splice(randomIndex, 1); // Ensure boxes don't overlap
+        const pos = validPositions.splice(randomIndex, 1)[0]; // 중복 위치 방지
+        treasureChests.push({ x: pos.x, y: pos.y, found: false });
     }
 }
+
+function checkTreasureChestCollision() {
+    const chest = treasureChests.find(c => !c.found && c.x === player.x && c.y === player.y);
+    if (chest) {
+        chest.found = true;
+        
+        // 비활성화된 능력 버튼 찾기
+        const disabledButtons = [qAbilityButton, wAbilityButton, eAbilityButton].filter(btn => btn.disabled);
+        
+        if (disabledButtons.length > 0) {
+            // 비활성화된 버튼 중 하나를 활성화
+            disabledButtons[0].disabled = false;
+        }
+        
+        // (선택) 보물상자 획득 사운드 재생
+        // playSound(someChestOpenSound);
+    }
+}
+
 
 function checkWin() {
     if (gameWon) return;
@@ -635,30 +660,6 @@ function playSound(soundElement) {
     }
 }
 
-function checkTreasure() {
-    const collectedBoxIndex = treasureBoxes.findIndex(box => box.x === player.x && box.y === player.y);
-
-    if (collectedBoxIndex > -1) {
-        const collectedBox = treasureBoxes[collectedBoxIndex];
-        
-        if (qAbilityButton.disabled) {
-            qAbilityButton.disabled = false;
-        } else if (wAbilityButton.disabled) {
-            wAbilityButton.disabled = false;
-        } else if (eAbilityButton.disabled) {
-            eAbilityButton.disabled = false;
-        }
-
-        playSound(spotSaveSound);
-
-        if (isMultiplayer && socket) {
-            socket.emit('treasureCollected', { x: collectedBox.x, y: collectedBox.y });
-        } else {
-            treasureBoxes.splice(collectedBoxIndex, 1);
-        }
-    }
-}
-
 function movePlayer(dx, dy) {
     if (gameWon) return;
     
@@ -677,8 +678,9 @@ function movePlayer(dx, dy) {
         playerPath.push({ ...player });
         if (playerPath.length > MAX_PLAYER_PATH) playerPath.shift();
         
-        checkTreasure();
+        checkTreasureChestCollision(); // 보물상자 충돌 확인
         checkWin();
+
         if (isSoundOn && audioContextResumed && gallopingSound) {
             clearTimeout(moveSoundTimeout);
             if (gallopingSound.paused) {
@@ -701,7 +703,6 @@ function saveOrLoadPosition(key) {
         playSound(spotSaveSound);
     } else if (savedPos) {
         player = { ...savedPos, character: player.character };
-        savedPositions[key] = null;
         checkWin();
         playSound(spotSaveSound);
     } else {
@@ -971,7 +972,6 @@ function setupSocketListeners() {
         endPos = data.endPos;
         MAZE_WIDTH = data.mazeSize.width;
         MAZE_HEIGHT = data.mazeSize.height;
-        treasureBoxes = data.treasureBoxes || [];
 
         const { maxWidth, maxHeight } = calculateMaxMazeSize();
         const isMax = MAZE_WIDTH === maxWidth && MAZE_HEIGHT === maxHeight;
@@ -1021,18 +1021,12 @@ function setupSocketListeners() {
     });
     socket.on('playerDisconnected', (playerId) => delete otherPlayers[playerId]);
 
-    socket.on('boxRemoved', ({ x, y }) => {
-        const boxIndex = treasureBoxes.findIndex(box => box.x === x && box.y === y);
-        if (boxIndex > -1) {
-            treasureBoxes.splice(boxIndex, 1);
-        }
-    });
-
     // New Ability Listeners
     socket.on('abilityQUsed', () => {
         console.log('Received ability Q, regenerating maze.');
         generateMaze();
         placeStartEnd();
+        generateTreasureChests(); // 상대방도 보물상자 재생성
         player = { ...startPos, character: player.character };
         playerPath = [{ ...player }];
         playImpactSound();
@@ -1149,7 +1143,6 @@ function resetClientGameState() {
     wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
-    treasureBoxes = [];
     
     [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
 }
@@ -1198,6 +1191,7 @@ function startGameplay() {
 
     gameWon = false; 
     for (let key in savedPositions) savedPositions[key] = null;
+    treasureChests = [];
 
     [winModal, helpModal, screenshotModal].forEach(modal => {
         if(modal.id !== 'winModal' || !socket) { 
@@ -1205,15 +1199,27 @@ function startGameplay() {
         }
     });
     
-    qAbilityButton.disabled = true;
-    wAbilityButton.disabled = true;
-    eAbilityButton.disabled = true;
+    // 게임 시작 시 모든 특수키 버튼 비활성화
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
+
+    // '함께하기' 모드에서 '다시 시작' 버튼 20초 후 활성화
+    if (isMultiplayer) {
+        restartButton.disabled = true;
+        setTimeout(() => {
+            if (!gameWon) { // 게임이 끝나지 않았을 경우에만 활성화
+                restartButton.disabled = false;
+            }
+        }, 20000);
+    } else {
+        restartButton.disabled = false; // 싱글플레이어에서는 항상 활성화
+    }
 
     clearInterval(timerInterval);
     
     player = { ...startPos, character: player.character || '🐎' };
     playerPath = [{ ...player }];
 
+    generateTreasureChests(); // 보물상자 생성
     initializeCanvasSize();
 
     if (socket) {
@@ -1231,16 +1237,18 @@ function startGameplay() {
 function initGame() {
     generateMaze();
     placeStartEnd();
-    placeTreasureBoxes();
     startGameplay();
 }
 
 function restartMazeOnly() {
     if (gameWon) return;
     
+    // '다시 시작' 시 특수키 버튼 비활성화
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
+
     generateMaze();
     placeStartEnd();
-    placeTreasureBoxes();
+    generateTreasureChests(); // 보물상자 재생성
 
     player = { ...startPos, character: player.character || '🐎' };
     playerPath = [{ ...player }];
