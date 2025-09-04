@@ -120,7 +120,7 @@ let MAZE_WIDTH = 11;
 let MAZE_HEIGHT = 11;
 let controlMode = 'keyboard';
 let maze = [];
-let player = { x: 0, y: 0, character: '🐎' }; // 플레이어 객체에 character 속성 추가
+let player = { x: 0, y: 0, character: 'horse' }; // 플레이어 객체에 character 'id' 저장
 let startPos = { x: 0, y: 0 };
 let endPos = { x: 0, y: 0 };
 let startTime;
@@ -136,6 +136,7 @@ let moveSoundTimeout = null;
 let singlePlayerSizeMode = 'preset'; // 'preset' or 'custom'
 let isMultiplayer = false; // 추가: 게임 모드 상태 변수
 let lobbySizeMode = 'preset';
+let treasureChests = []; // 보물상자 위치 및 상태 저장 배열
 
 
 // 멀티플레이어 상태
@@ -144,8 +145,18 @@ let otherPlayers = {};
 let playerRole = 'guest';
 let playerNickname = '';
 let currentRoomId = null;
-let selectedCharacter = null; // 내가 선택한 캐릭터
-const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
+let selectedCharacter = null; // 내가 선택한 캐릭터의 'id'
+const CHARACTER_LIST = [
+    { id: 'horse', standing: '🐎', moving: '🐎' },
+    { id: 'rabbit', standing: '🐇', moving: '🐇' },
+    { id: 'turtle', standing: '🐢', moving: '🐢' },
+    { id: 'dog', standing: '🐕', moving: '🐕' },
+    { id: 'cat', standing: '🐈', moving: '🐈' },
+    { id: 'tiger', standing: '🐅', moving: '🐅' },
+    { id: 'mouse', standing: 'icon/mouse_standing.jpg', moving: 'icon/mouse_animation.gif' }
+];
+let loadedImages = {};
+let isPlayerMoving = false;
 
 
 // Joystick state
@@ -249,16 +260,47 @@ function drawMaze(flagYOffset = 0) {
         }
     }
 
-    ctx.globalAlpha = 0.5; // 상대방 캐릭터 투명도 설정
-    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-    for (const id in otherPlayers) {
-        const otherPlayer = otherPlayers[id];
-        ctx.fillText(otherPlayer.character || '👽', otherPlayer.x * TILE_SIZE + TILE_SIZE / 2, otherPlayer.y * TILE_SIZE + TILE_SIZE / 2);
+    // 보물상자 그리기
+    const treasureImg = loadedImages['icon/treasure_chest.png'];
+    if (treasureImg && treasureImg.complete) {
+        treasureChests.forEach(chest => {
+            if (!chest.found) {
+                const imgSize = TILE_SIZE * 4.0;
+                ctx.drawImage(treasureImg, (chest.x * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, (chest.y * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, imgSize, imgSize);
+            }
+        });
     }
-    ctx.globalAlpha = 1.0; // 원래 투명도로 복구
 
-    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-    ctx.fillText(player.character, player.x * TILE_SIZE + TILE_SIZE / 2, player.y * TILE_SIZE + TILE_SIZE / 2);
+    const drawCharacter = (charId, x, y, isMainPlayer) => {
+        const characterData = CHARACTER_LIST.find(c => c.id === charId);
+        if (!characterData) {
+            ctx.font = `${TILE_SIZE * 4.0}px Arial`;
+            ctx.fillText('?', x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
+            return;
+        }
+
+        let asset = (isMainPlayer && isPlayerMoving) ? characterData.moving : characterData.standing;
+
+        if (asset.endsWith('.jpg') || asset.endsWith('.gif') || asset.endsWith('.png')) {
+            const img = loadedImages[asset];
+            if (img && img.complete) {
+                const imgSize = TILE_SIZE * 4.0;
+                ctx.drawImage(img, (x * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, (y * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, imgSize, imgSize);
+            }
+        } else {
+            ctx.font = `${TILE_SIZE * 4.0}px Arial`;
+            ctx.fillText(asset, x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
+        }
+    };
+
+    ctx.globalAlpha = 0.5;
+    for (const id in otherPlayers) {
+        const other = otherPlayers[id];
+        drawCharacter(other.character, other.x, other.y, false);
+    }
+    ctx.globalAlpha = 1.0;
+
+    drawCharacter(player.character, player.x, player.y, true);
 }
 
 function animate() {
@@ -566,6 +608,30 @@ function placeStartEnd() {
     playerPath = [{ ...player }];
 }
 
+function generateTreasureChests() {
+    treasureChests = [];
+    const numberOfChests = Math.floor(Math.random() * 3) + 1; // 1에서 3개 사이
+
+    const pathCells = [];
+    for (let r = 0; r < MAZE_HEIGHT; r++) {
+        for (let c = 0; c < MAZE_WIDTH; c++) {
+            // 길(0)이면서, 캐릭터가 실제로 위치할 수 있는 중심 좌표인지 확인
+            if (maze[r][c] === 0 && (c - CENTER_OFFSET) % STEP === 0 && (r - CENTER_OFFSET) % STEP === 0) {
+                // 시작점과 도착점은 제외
+                if ((c !== startPos.x || r !== startPos.y) && (c !== endPos.x || r !== endPos.y)) {
+                    pathCells.push({ x: c, y: r });
+                }
+            }
+        }
+    }
+
+    for (let i = 0; i < numberOfChests && pathCells.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * pathCells.length);
+        const selectedCell = pathCells.splice(randomIndex, 1)[0]; // 중복 방지를 위해 배열에서 제거
+        treasureChests.push({ ...selectedCell, found: false });
+    }
+}
+
 function checkWin() {
     if (gameWon) return;
 
@@ -607,6 +673,22 @@ function playSound(soundElement) {
     }
 }
 
+function checkTreasureChests() {
+    const foundChestIndex = treasureChests.findIndex(chest => !chest.found && chest.x === player.x && chest.y === player.y);
+
+    if (foundChestIndex !== -1) {
+        treasureChests[foundChestIndex].found = true;
+        
+        const disabledButtons = [qAbilityButton, wAbilityButton, eAbilityButton].filter(btn => btn.disabled);
+
+        if (disabledButtons.length > 0) {
+            const buttonToEnable = disabledButtons[Math.floor(Math.random() * disabledButtons.length)];
+            buttonToEnable.disabled = false;
+            playSound(clearSound); // 보물 획득 시 사운드 재생
+        }
+    }
+}
+
 function movePlayer(dx, dy) {
     if (gameWon) return;
     
@@ -625,14 +707,18 @@ function movePlayer(dx, dy) {
         playerPath.push({ ...player });
         if (playerPath.length > MAX_PLAYER_PATH) playerPath.shift();
         
+        checkTreasureChests(); // 이동 후 보물상자 확인
         checkWin();
+
         if (isSoundOn && audioContextResumed && gallopingSound) {
+            isPlayerMoving = true;
             clearTimeout(moveSoundTimeout);
             if (gallopingSound.paused) {
                 gallopingSound.play().catch(e => console.error("Error playing sound:", e));
             }
             moveSoundTimeout = setTimeout(() => {
                 gallopingSound.pause();
+                isPlayerMoving = false;
             }, 500);
         }
     }
@@ -648,7 +734,6 @@ function saveOrLoadPosition(key) {
         playSound(spotSaveSound);
     } else if (savedPos) {
         player = { ...savedPos, character: player.character };
-        savedPositions[key] = null;
         checkWin();
         playSound(spotSaveSound);
     } else {
@@ -771,19 +856,30 @@ function updateCharacterSelectionUI(lobbyState) {
     CHARACTER_LIST.forEach(char => {
         const button = document.createElement('button');
         button.className = 'character-button';
-        button.textContent = char;
-        button.dataset.character = char;
+        button.dataset.character = char.id;
+
+        if (char.standing.endsWith('.jpg') || char.standing.endsWith('.gif') || char.standing.endsWith('.png')) {
+            const img = document.createElement('img');
+            img.src = char.standing;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'contain';
+            img.style.pointerEvents = 'none'; // Prevent image from capturing click
+            button.appendChild(img);
+        } else {
+            button.textContent = char.standing;
+        }
 
         const indicator = document.createElement('span');
         indicator.className = 'ready-indicator';
         indicator.textContent = '✅';
         button.appendChild(indicator);
 
-        if (selectedCharacter === char) {
+        if (selectedCharacter === char.id) {
             button.classList.add('selected');
         }
 
-        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char);
+        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char.id);
 
         if (playerWithChar) {
             if (playerWithChar.isReady) {
@@ -943,7 +1039,7 @@ function setupSocketListeners() {
         }
         
         isMultiplayer = true;
-        startGameplay();
+        initGame(); // startGameplay() 대신 initGame() 호출하여 보물상자 생성
     });
 
     socket.on('gameOver', (data) => {
@@ -972,6 +1068,7 @@ function setupSocketListeners() {
         console.log('Received ability Q, regenerating maze.');
         generateMaze();
         placeStartEnd();
+        generateTreasureChests(); // 미로 변경 시 보물상자도 재생성
         player = { ...startPos, character: player.character };
         playerPath = [{ ...player }];
         playImpactSound();
@@ -1088,8 +1185,9 @@ function resetClientGameState() {
     wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
+    treasureChests = []; // 게임 상태 리셋 시 보물상자도 초기화
     
-    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = false);
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
 }
 
 function handleGoToLobbyChoice() {
@@ -1119,7 +1217,7 @@ function handlePlayAgain() {
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
     } else {
-        startGameplay();
+        initGame(); // 다시하기 시 initGame() 호출
     }
 }
 
@@ -1143,14 +1241,12 @@ function startGameplay() {
         }
     });
     
-    const isSinglePlayer = !isMultiplayer;
-    qAbilityButton.disabled = isSinglePlayer;
-    wAbilityButton.disabled = isSinglePlayer;
-    eAbilityButton.disabled = isSinglePlayer;
+    // 게임 시작 시 모든 스킬 버튼을 비활성화
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
 
     clearInterval(timerInterval);
     
-    player = { ...startPos, character: player.character || '🐎' };
+    player = { ...startPos, character: player.character || 'horse' };
     playerPath = [{ ...player }];
 
     initializeCanvasSize();
@@ -1170,6 +1266,7 @@ function startGameplay() {
 function initGame() {
     generateMaze();
     placeStartEnd();
+    generateTreasureChests(); // 미로, 시작/끝점 설정 후 보물상자 생성
     startGameplay();
 }
 
@@ -1178,8 +1275,9 @@ function restartMazeOnly() {
     
     generateMaze();
     placeStartEnd();
+    generateTreasureChests(); // 미로 재시작 시 보물상자도 재생성
 
-    player = { ...startPos, character: player.character || '🐎' };
+    player = { ...startPos, character: player.character || 'horse' };
     playerPath = [{ ...player }];
     for (let key in savedPositions) savedPositions[key] = null;
     
@@ -1270,7 +1368,7 @@ function setupEventListeners() {
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
-        player.character = '🐎';
+        player.character = 'mouse';
         initGame();
     });
 
@@ -1487,19 +1585,19 @@ function setupEventListeners() {
     document.addEventListener('touchend', stopJoystick);
 
     qAbilityButton.addEventListener('click', () => {
-        if (isMultiplayer && socket) {
+        if (socket) { // 멀티/싱글 무관하게 서버 연결되어 있으면 작동
             socket.emit('useAbilityQ');
             qAbilityButton.disabled = true;
         }
     });
     wAbilityButton.addEventListener('click', () => {
-        if (isMultiplayer && socket) {
+        if (socket) {
             socket.emit('useAbilityW');
             wAbilityButton.disabled = true;
         }
     });
     eAbilityButton.addEventListener('click', () => {
-        if (isMultiplayer && socket) {
+        if (socket) {
             socket.emit('useAbilityE');
             eAbilityButton.disabled = true;
         }
@@ -1562,11 +1660,34 @@ function populateSizeDropdowns() {
     mazeHeightSelectLobby.value = defaultSize;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function preloadImages() {
+    const promises = [];
+    const imagePaths = new Set();
+    CHARACTER_LIST.forEach(char => {
+        if (char.standing.includes('/')) imagePaths.add(char.standing);
+        if (char.moving.includes('/')) imagePaths.add(char.moving);
+    });
+    imagePaths.add('icon/treasure_chest.png'); // 보물상자 이미지 추가
+
+    imagePaths.forEach(path => {
+        const img = new Image();
+        promises.push(new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve; // 에러가 나도 로딩은 계속되도록
+        }));
+        img.src = path;
+        loadedImages[path] = img;
+    });
+
+    return Promise.all(promises);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
     if (!CanvasRenderingContext2D.prototype.roundRect) {
         CanvasRenderingContext2D.prototype.roundRect=function(t,e,o,i,n){return o<2*n&&(n=o/2),i<2*n&&(n=i/2),this.beginPath(),this.moveTo(t+n,e),this.arcTo(t+o,e,t+o,e+i,n),this.arcTo(t+o,e+i,t,e+i,n),this.arcTo(t,e+i,t,e,n),this.arcTo(t,e,t+o,e,n),this.closePath(),this}
     }
     
+    await preloadImages();
     setupEventListeners();
     initAudio();
     showStartScreen();
