@@ -2,17 +2,23 @@
 
 const express = require('express');
 const http = require('http');
+const path = require('path'); // path 모듈 추가
 const { Server } = require("socket.io");
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
-app.use('/icon', express.static('icon'));
-
+// CORS 설정 (기존 코드 유지)
 app.use(cors({
   origin: "https://miromulti.pages.dev" 
 }));
+
+// 정적 파일 제공을 위한 미들웨어 추가
+// __dirname은 현재 실행 중인 server.js 파일이 위치한 디렉토리 경로입니다.
+// 이 코드는 프로젝트 루트 폴더의 모든 파일을 정적 파일로 제공하도록 설정합니다.
+app.use(express.static(path.join(__dirname)));
+
 
 const server = http.createServer(app);
 
@@ -29,17 +35,7 @@ let players = {};
 let rooms = {};
 let playerRooms = {};
 
-const CHARACTER_LIST = [
-    { id: 'horse', icon: '🐎' },
-    { id: 'rabbit', icon: '🐇' },
-    { id: 'turtle', icon: '🐢' },
-    { id: 'dog', icon: '🐕' },
-    { id: 'cat', icon: '🐈' },
-    { id: 'tiger', icon: '🐅' },
-    { id: 'mouse', icon: 'icon/mouse_standing.jpg' }
-];
-const CHARACTER_IDS = CHARACTER_LIST.map(c => c.id);
-
+const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅', '쥐']; // 서버 캐릭터 리스트에 '쥐' 추가
 
 const updateLobbyState = (roomId) => {
     if (rooms[roomId]) {
@@ -264,7 +260,7 @@ io.on('connection', (socket) => {
         gameStarted: false,
         finishers: [],
         maxPlayers: 4,
-        availableCharacters: [...CHARACTER_IDS],
+        availableCharacters: [...CHARACTER_LIST],
         timeoutId: null,
         forceStartTimer: null,
         lastGameData: null
@@ -334,7 +330,7 @@ io.on('connection', (socket) => {
       if (!player) return;
 
       const isCharacterTaken = Object.values(room.players).some(p => p.character === character);
-      if (!isCharacterTaken && CHARACTER_IDS.includes(character)) {
+      if (!isCharacterTaken && CHARACTER_LIST.includes(character)) {
           if (player.character) {
               room.availableCharacters.push(player.character);
           }

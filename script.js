@@ -61,6 +61,7 @@ const mazeHeightSelect = document.getElementById('mazeHeightSelect');
 const presetModeBtn = document.getElementById('presetModeBtn');
 const presetContent = document.getElementById('presetContent');
 const customContent = document.getElementById('customContent');
+const characterSelectContainerSinglePlayer = document.getElementById('characterSelectContainerSinglePlayer');
 
 
 // --- 추가된 DOM 요소 (멀티플레이) ---
@@ -120,7 +121,7 @@ let MAZE_WIDTH = 11;
 let MAZE_HEIGHT = 11;
 let controlMode = 'keyboard';
 let maze = [];
-let player = { x: 0, y: 0, character: 'horse' }; // 플레이어 객체에 character 'id' 저장
+let player = { x: 0, y: 0, character: null, isMoving: false }; // 플레이어 객체 수정
 let startPos = { x: 0, y: 0 };
 let endPos = { x: 0, y: 0 };
 let startTime;
@@ -136,7 +137,6 @@ let moveSoundTimeout = null;
 let singlePlayerSizeMode = 'preset'; // 'preset' or 'custom'
 let isMultiplayer = false; // 추가: 게임 모드 상태 변수
 let lobbySizeMode = 'preset';
-let treasureChests = []; // 보물상자 위치 및 상태 저장 배열
 
 
 // 멀티플레이어 상태
@@ -145,18 +145,37 @@ let otherPlayers = {};
 let playerRole = 'guest';
 let playerNickname = '';
 let currentRoomId = null;
-let selectedCharacter = null; // 내가 선택한 캐릭터의 'id'
-const CHARACTER_LIST = [
-    { id: 'horse', standing: '🐎', moving: '🐎' },
-    { id: 'rabbit', standing: '🐇', moving: '🐇' },
-    { id: 'turtle', standing: '🐢', moving: '🐢' },
-    { id: 'dog', standing: '🐕', moving: '🐕' },
-    { id: 'cat', standing: '🐈', moving: '🐈' },
-    { id: 'tiger', standing: '🐅', moving: '🐅' },
-    { id: 'mouse', standing: 'icon/mouse_standing.jpg', moving: 'icon/mouse_animation.gif' }
-];
-let loadedImages = {};
-let isPlayerMoving = false;
+let selectedCharacter = null; // 내가 선택한 캐릭터
+const CHARACTER_LIST_MULTI = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅']; // 멀티플레이용
+const CHARACTER_LIST_SINGLE = ['쥐', '🐎']; // 싱글플레이용
+
+// 캐릭터 데이터 및 이미지 로딩
+const CHARACTERS = {};
+
+function preloadCharacterImages() {
+    const allCharacters = {
+        '쥐': { type: 'image', standingSrc: 'icon/mouse_standing.jpg', movingSrc: 'icon/mouse_animation.gif' },
+        '🐎': { type: 'emoji', value: '🐎' },
+        '🐇': { type: 'emoji', value: '🐇' },
+        '🐢': { type: 'emoji', value: '🐢' },
+        '🐕': { type: 'emoji', value: '🐕' },
+        '🐈': { type: 'emoji', value: '🐈' },
+        '🐅': { type: 'emoji', value: '🐅' }
+    };
+
+    for (const name in allCharacters) {
+        const data = allCharacters[name];
+        CHARACTERS[name] = { type: data.type };
+        if (data.type === 'image') {
+            CHARACTERS[name].standing = new Image();
+            CHARACTERS[name].standing.src = data.standingSrc;
+            CHARACTERS[name].moving = new Image();
+            CHARACTERS[name].moving.src = data.movingSrc;
+        } else {
+            CHARACTERS[name].value = data.value;
+        }
+    }
+}
 
 
 // Joystick state
@@ -220,6 +239,26 @@ function initializeCanvasSize() {
     canvas.height = MAZE_HEIGHT * TILE_SIZE;
 }
 
+function drawPlayer(p) {
+    const char = p.character;
+    if (!char) return;
+
+    const centerX = p.x * TILE_SIZE + TILE_SIZE / 2;
+    const centerY = p.y * TILE_SIZE + TILE_SIZE / 2;
+
+    if (char.type === 'image') {
+        const img = p.isMoving ? char.moving : char.standing;
+        const imgSize = TILE_SIZE * 4.5;
+        if (img && img.complete) {
+            ctx.drawImage(img, centerX - imgSize / 2, centerY - imgSize / 2, imgSize, imgSize);
+        }
+    } else { // emoji
+        ctx.font = `${TILE_SIZE * 4.0}px Arial`;
+        ctx.fillText(char.value, centerX, centerY);
+    }
+}
+
+
 function drawMaze(flagYOffset = 0) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const wallColor = '#555555';
@@ -260,47 +299,17 @@ function drawMaze(flagYOffset = 0) {
         }
     }
 
-    // 보물상자 그리기
-    const treasureImg = loadedImages['icon/treasure_chest.png'];
-    if (treasureImg && treasureImg.complete) {
-        treasureChests.forEach(chest => {
-            if (!chest.found) {
-                const imgSize = TILE_SIZE * 4.0;
-                ctx.drawImage(treasureImg, (chest.x * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, (chest.y * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, imgSize, imgSize);
-            }
-        });
-    }
-
-    const drawCharacter = (charId, x, y, isMainPlayer) => {
-        const characterData = CHARACTER_LIST.find(c => c.id === charId);
-        if (!characterData) {
-            ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-            ctx.fillText('?', x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
-            return;
-        }
-
-        let asset = (isMainPlayer && isPlayerMoving) ? characterData.moving : characterData.standing;
-
-        if (asset.endsWith('.jpg') || asset.endsWith('.gif') || asset.endsWith('.png')) {
-            const img = loadedImages[asset];
-            if (img && img.complete) {
-                const imgSize = TILE_SIZE * 4.0;
-                ctx.drawImage(img, (x * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, (y * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, imgSize, imgSize);
-            }
-        } else {
-            ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-            ctx.fillText(asset, x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
-        }
-    };
-
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.5; // 상대방 캐릭터 투명도 설정
     for (const id in otherPlayers) {
-        const other = otherPlayers[id];
-        drawCharacter(other.character, other.x, other.y, false);
+        const otherPlayer = otherPlayers[id];
+        const char = CHARACTERS[otherPlayer.characterName];
+        if (char) {
+            drawPlayer({ ...otherPlayer, character: char, isMoving: true }); // Assume others are always moving for simplicity
+        }
     }
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = 1.0; // 원래 투명도로 복구
 
-    drawCharacter(player.character, player.x, player.y, true);
+    drawPlayer(player);
 }
 
 function animate() {
@@ -392,10 +401,13 @@ function showStartScreen() {
     controlMode = 'keyboard';
     document.querySelectorAll('.control-mode-button').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll(`.control-mode-button[data-mode="keyboard"]`).forEach(btn => btn.classList.add('active'));
-    levelSelect.value = '43';
+    levelSelect.value = '91';
     setSinglePlayerSizeMode('preset');
     
     populateSizeDropdowns();
+    populateCharacterSelect(characterSelectContainerSinglePlayer, CHARACTER_LIST_SINGLE, '쥐');
+    player.character = CHARACTERS['쥐'];
+
     const { maxWidth, maxHeight } = calculateMaxMazeSize();
     mazeWidthSelect.value = Math.min(127, maxWidth);
     mazeHeightSelect.value = Math.min(127, maxHeight);
@@ -604,32 +616,9 @@ function placeStartEnd() {
         endPos = pathCells.length > 1 ? pathCells[pathCells.length - 1] : {x:MAZE_WIDTH-1-CENTER_OFFSET, y:MAZE_HEIGHT-1-CENTER_OFFSET};
     }
     
-    player = { ...startPos, character: player.character };
+    player.x = startPos.x;
+    player.y = startPos.y;
     playerPath = [{ ...player }];
-}
-
-function generateTreasureChests() {
-    treasureChests = [];
-    const numberOfChests = Math.floor(Math.random() * 3) + 1; // 1에서 3개 사이
-
-    const pathCells = [];
-    for (let r = 0; r < MAZE_HEIGHT; r++) {
-        for (let c = 0; c < MAZE_WIDTH; c++) {
-            // 길(0)이면서, 캐릭터가 실제로 위치할 수 있는 중심 좌표인지 확인
-            if (maze[r][c] === 0 && (c - CENTER_OFFSET) % STEP === 0 && (r - CENTER_OFFSET) % STEP === 0) {
-                // 시작점과 도착점은 제외
-                if ((c !== startPos.x || r !== startPos.y) && (c !== endPos.x || r !== endPos.y)) {
-                    pathCells.push({ x: c, y: r });
-                }
-            }
-        }
-    }
-
-    for (let i = 0; i < numberOfChests && pathCells.length > 0; i++) {
-        const randomIndex = Math.floor(Math.random() * pathCells.length);
-        const selectedCell = pathCells.splice(randomIndex, 1)[0]; // 중복 방지를 위해 배열에서 제거
-        treasureChests.push({ ...selectedCell, found: false });
-    }
 }
 
 function checkWin() {
@@ -654,6 +643,7 @@ function checkWin() {
         
         clearTimeout(moveSoundTimeout);
         if (gallopingSound) gallopingSound.pause();
+        player.isMoving = false;
         if (isSoundOn && clearSound) {
             clearSound.currentTime = 0;
             clearSound.play();
@@ -670,22 +660,6 @@ function playSound(soundElement) {
     if (isSoundOn && soundElement) {
         soundElement.currentTime = 0;
         soundElement.play();
-    }
-}
-
-function checkTreasureChests() {
-    const foundChestIndex = treasureChests.findIndex(chest => !chest.found && chest.x === player.x && chest.y === player.y);
-
-    if (foundChestIndex !== -1) {
-        treasureChests[foundChestIndex].found = true;
-        
-        const disabledButtons = [qAbilityButton, wAbilityButton, eAbilityButton].filter(btn => btn.disabled);
-
-        if (disabledButtons.length > 0) {
-            const buttonToEnable = disabledButtons[Math.floor(Math.random() * disabledButtons.length)];
-            buttonToEnable.disabled = false;
-            playSound(clearSound); // 보물 획득 시 사운드 재생
-        }
     }
 }
 
@@ -707,18 +681,16 @@ function movePlayer(dx, dy) {
         playerPath.push({ ...player });
         if (playerPath.length > MAX_PLAYER_PATH) playerPath.shift();
         
-        checkTreasureChests(); // 이동 후 보물상자 확인
         checkWin();
-
         if (isSoundOn && audioContextResumed && gallopingSound) {
-            isPlayerMoving = true;
             clearTimeout(moveSoundTimeout);
+            player.isMoving = true;
             if (gallopingSound.paused) {
                 gallopingSound.play().catch(e => console.error("Error playing sound:", e));
             }
             moveSoundTimeout = setTimeout(() => {
                 gallopingSound.pause();
-                isPlayerMoving = false;
+                player.isMoving = false;
             }, 500);
         }
     }
@@ -733,7 +705,9 @@ function saveOrLoadPosition(key) {
         savedPositions[key] = null;
         playSound(spotSaveSound);
     } else if (savedPos) {
-        player = { ...savedPos, character: player.character };
+        player.x = savedPos.x;
+        player.y = savedPos.y;
+        savedPositions[key] = null;
         checkWin();
         playSound(spotSaveSound);
     } else {
@@ -848,26 +822,51 @@ function sendMyMaxSize() {
     }
 }
 
+function populateCharacterSelect(container, characterNameList, defaultCharName) {
+    container.innerHTML = '';
+    
+    characterNameList.forEach(name => {
+        const charData = CHARACTERS[name];
+        const button = document.createElement('button');
+        button.className = 'character-button';
+        button.dataset.character = name;
+
+        if (charData.type === 'image') {
+            const img = document.createElement('img');
+            img.src = charData.standing.src;
+            img.alt = name;
+            button.appendChild(img);
+        } else {
+            button.textContent = charData.value;
+        }
+        
+        if (name === defaultCharName) {
+            button.classList.add('selected');
+        }
+        
+        container.appendChild(button);
+    });
+}
+
+
 function updateCharacterSelectionUI(lobbyState) {
     characterSelectContainer.innerHTML = '';
     const myPlayer = lobbyState.players[socket.id];
     selectedCharacter = myPlayer ? myPlayer.character : null;
 
-    CHARACTER_LIST.forEach(char => {
+    CHARACTER_LIST_MULTI.forEach(charName => {
+        const charData = CHARACTERS[charName];
         const button = document.createElement('button');
         button.className = 'character-button';
-        button.dataset.character = char.id;
+        button.dataset.character = charName;
 
-        if (char.standing.endsWith('.jpg') || char.standing.endsWith('.gif') || char.standing.endsWith('.png')) {
+        if (charData.type === 'image') {
             const img = document.createElement('img');
-            img.src = char.standing;
-            img.style.width = '100%';
-            img.style.height = '100%';
-            img.style.objectFit = 'contain';
-            img.style.pointerEvents = 'none'; // Prevent image from capturing click
+            img.src = charData.standing.src;
+            img.alt = charName;
             button.appendChild(img);
         } else {
-            button.textContent = char.standing;
+            button.textContent = charData.value;
         }
 
         const indicator = document.createElement('span');
@@ -875,11 +874,11 @@ function updateCharacterSelectionUI(lobbyState) {
         indicator.textContent = '✅';
         button.appendChild(indicator);
 
-        if (selectedCharacter === char.id) {
+        if (selectedCharacter === charName) {
             button.classList.add('selected');
         }
 
-        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char.id);
+        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === charName);
 
         if (playerWithChar) {
             if (playerWithChar.isReady) {
@@ -1031,15 +1030,15 @@ function setupSocketListeners() {
                     id: playerId,
                     x: data.startPos.x,
                     y: data.startPos.y,
-                    character: data.players[playerId].character
+                    characterName: data.players[playerId].character
                 };
             } else {
-                player.character = data.players[playerId].character;
+                player.character = CHARACTERS[data.players[playerId].character];
             }
         }
         
         isMultiplayer = true;
-        initGame(); // startGameplay() 대신 initGame() 호출하여 보물상자 생성
+        startGameplay();
     });
 
     socket.on('gameOver', (data) => {
@@ -1056,7 +1055,7 @@ function setupSocketListeners() {
         if (otherPlayers[playerInfo.id]) {
             otherPlayers[playerInfo.id].x = playerInfo.x;
             otherPlayers[playerInfo.id].y = playerInfo.y;
-            otherPlayers[playerInfo.id].character = playerInfo.character;
+            otherPlayers[playerInfo.id].characterName = playerInfo.character;
         } else if (playerInfo.id !== socket.id) {
             otherPlayers[playerInfo.id] = playerInfo;
         }
@@ -1068,15 +1067,16 @@ function setupSocketListeners() {
         console.log('Received ability Q, regenerating maze.');
         generateMaze();
         placeStartEnd();
-        generateTreasureChests(); // 미로 변경 시 보물상자도 재생성
-        player = { ...startPos, character: player.character };
+        player.x = startPos.x;
+        player.y = startPos.y;
         playerPath = [{ ...player }];
         playImpactSound();
     });
 
     socket.on('abilityWUsed', () => {
         console.log('Received ability W, resetting position.');
-        player = { ...startPos, character: player.character };
+        player.x = startPos.x;
+        player.y = startPos.y;
         playerPath = [{ ...player }];
         playSound(spotLoadSound);
     });
@@ -1185,9 +1185,8 @@ function resetClientGameState() {
     wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
-    treasureChests = []; // 게임 상태 리셋 시 보물상자도 초기화
     
-    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
+    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = false);
 }
 
 function handleGoToLobbyChoice() {
@@ -1217,7 +1216,7 @@ function handlePlayAgain() {
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
     } else {
-        initGame(); // 다시하기 시 initGame() 호출
+        startGameplay();
     }
 }
 
@@ -1241,12 +1240,16 @@ function startGameplay() {
         }
     });
     
-    // 게임 시작 시 모든 스킬 버튼을 비활성화
-    [qAbilityButton, wAbilityButton, eAbilityButton].forEach(btn => btn.disabled = true);
+    const isSinglePlayer = !isMultiplayer;
+    qAbilityButton.disabled = isSinglePlayer;
+    wAbilityButton.disabled = isSinglePlayer;
+    eAbilityButton.disabled = isSinglePlayer;
 
     clearInterval(timerInterval);
     
-    player = { ...startPos, character: player.character || 'horse' };
+    player.x = startPos.x;
+    player.y = startPos.y;
+    player.isMoving = false;
     playerPath = [{ ...player }];
 
     initializeCanvasSize();
@@ -1266,7 +1269,6 @@ function startGameplay() {
 function initGame() {
     generateMaze();
     placeStartEnd();
-    generateTreasureChests(); // 미로, 시작/끝점 설정 후 보물상자 생성
     startGameplay();
 }
 
@@ -1275,9 +1277,9 @@ function restartMazeOnly() {
     
     generateMaze();
     placeStartEnd();
-    generateTreasureChests(); // 미로 재시작 시 보물상자도 재생성
 
-    player = { ...startPos, character: player.character || 'horse' };
+    player.x = startPos.x;
+    player.y = startPos.y;
     playerPath = [{ ...player }];
     for (let key in savedPositions) savedPositions[key] = null;
     
@@ -1314,7 +1316,7 @@ function setLobbySizeMode(mode) {
         presetModeBtnLobby.classList.add('active');
         customModeBtnLobby.classList.remove('active');
     } else { // 'custom'
-        presetContentLobby.classList.add('disabled-content');
+        presetContentLobby.add('disabled-content');
         customContentLobby.classList.remove('disabled-content');
         presetModeBtnLobby.classList.remove('active');
         customModeBtnLobby.classList.add('active');
@@ -1334,6 +1336,18 @@ function setupEventListeners() {
                 document.querySelectorAll(`.control-mode-button[data-mode="${controlMode}"]`).forEach(btn => btn.classList.add('active'));
             }
         });
+    });
+
+    characterSelectContainerSinglePlayer.addEventListener('click', (e) => {
+        const button = e.target.closest('.character-button');
+        if (button) {
+            const charName = button.dataset.character;
+            player.character = CHARACTERS[charName];
+            
+            // Update selection visual
+            characterSelectContainerSinglePlayer.querySelectorAll('.character-button').forEach(btn => btn.classList.remove('selected'));
+            button.classList.add('selected');
+        }
     });
 
     startSinglePlayerButton.addEventListener('click', () => {
@@ -1368,7 +1382,11 @@ function setupEventListeners() {
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
-        player.character = 'mouse';
+        
+        if (!player.character) { // If no character was selected, default to the first one
+            player.character = CHARACTERS[CHARACTER_LIST_SINGLE[0]];
+        }
+        
         initGame();
     });
 
@@ -1585,19 +1603,19 @@ function setupEventListeners() {
     document.addEventListener('touchend', stopJoystick);
 
     qAbilityButton.addEventListener('click', () => {
-        if (socket) { // 멀티/싱글 무관하게 서버 연결되어 있으면 작동
+        if (isMultiplayer && socket) {
             socket.emit('useAbilityQ');
             qAbilityButton.disabled = true;
         }
     });
     wAbilityButton.addEventListener('click', () => {
-        if (socket) {
+        if (isMultiplayer && socket) {
             socket.emit('useAbilityW');
             wAbilityButton.disabled = true;
         }
     });
     eAbilityButton.addEventListener('click', () => {
-        if (socket) {
+        if (isMultiplayer && socket) {
             socket.emit('useAbilityE');
             eAbilityButton.disabled = true;
         }
@@ -1660,34 +1678,12 @@ function populateSizeDropdowns() {
     mazeHeightSelectLobby.value = defaultSize;
 }
 
-function preloadImages() {
-    const promises = [];
-    const imagePaths = new Set();
-    CHARACTER_LIST.forEach(char => {
-        if (char.standing.includes('/')) imagePaths.add(char.standing);
-        if (char.moving.includes('/')) imagePaths.add(char.moving);
-    });
-    imagePaths.add('icon/treasure_chest.png'); // 보물상자 이미지 추가
-
-    imagePaths.forEach(path => {
-        const img = new Image();
-        promises.push(new Promise(resolve => {
-            img.onload = resolve;
-            img.onerror = resolve; // 에러가 나도 로딩은 계속되도록
-        }));
-        img.src = path;
-        loadedImages[path] = img;
-    });
-
-    return Promise.all(promises);
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     if (!CanvasRenderingContext2D.prototype.roundRect) {
         CanvasRenderingContext2D.prototype.roundRect=function(t,e,o,i,n){return o<2*n&&(n=o/2),i<2*n&&(n=i/2),this.beginPath(),this.moveTo(t+n,e),this.arcTo(t+o,e,t+o,e+i,n),this.arcTo(t+o,e+i,t,e+i,n),this.arcTo(t,e+i,t,e,n),this.arcTo(t,e,t+o,e,n),this.closePath(),this}
     }
     
-    await preloadImages();
+    preloadCharacterImages();
     setupEventListeners();
     initAudio();
     showStartScreen();
