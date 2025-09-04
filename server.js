@@ -8,6 +8,8 @@ const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
+app.use('/icon', express.static('icon'));
+
 app.use(cors({
   origin: "https://miromulti.pages.dev" 
 }));
@@ -27,7 +29,17 @@ let players = {};
 let rooms = {};
 let playerRooms = {};
 
-const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
+const CHARACTER_LIST = [
+    { id: 'horse', icon: '🐎' },
+    { id: 'rabbit', icon: '🐇' },
+    { id: 'turtle', icon: '🐢' },
+    { id: 'dog', icon: '🐕' },
+    { id: 'cat', icon: '🐈' },
+    { id: 'tiger', icon: '🐅' },
+    { id: 'mouse', icon: 'icon/mouse_standing.jpg' }
+];
+const CHARACTER_IDS = CHARACTER_LIST.map(c => c.id);
+
 
 const updateLobbyState = (roomId) => {
     if (rooms[roomId]) {
@@ -252,7 +264,7 @@ io.on('connection', (socket) => {
         gameStarted: false,
         finishers: [],
         maxPlayers: 4,
-        availableCharacters: [...CHARACTER_LIST],
+        availableCharacters: [...CHARACTER_IDS],
         timeoutId: null,
         forceStartTimer: null,
         lastGameData: null
@@ -322,7 +334,7 @@ io.on('connection', (socket) => {
       if (!player) return;
 
       const isCharacterTaken = Object.values(room.players).some(p => p.character === character);
-      if (!isCharacterTaken && CHARACTER_LIST.includes(character)) {
+      if (!isCharacterTaken && CHARACTER_IDS.includes(character)) {
           if (player.character) {
               room.availableCharacters.push(player.character);
           }
