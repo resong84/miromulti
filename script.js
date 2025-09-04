@@ -120,7 +120,7 @@ let MAZE_WIDTH = 11;
 let MAZE_HEIGHT = 11;
 let controlMode = 'keyboard';
 let maze = [];
-let player = { x: 0, y: 0, character: 'horse' }; // 플레이어 객체에 character 'id' 저장
+let player = { x: 0, y: 0, character: '🐎' }; // 플레이어 객체에 character 속성 추가
 let startPos = { x: 0, y: 0 };
 let endPos = { x: 0, y: 0 };
 let startTime;
@@ -144,18 +144,8 @@ let otherPlayers = {};
 let playerRole = 'guest';
 let playerNickname = '';
 let currentRoomId = null;
-let selectedCharacter = null; // 내가 선택한 캐릭터의 'id'
-const CHARACTER_LIST = [
-    { id: 'horse', standing: '🐎', moving: '🐎' },
-    { id: 'rabbit', standing: '🐇', moving: '🐇' },
-    { id: 'turtle', standing: '🐢', moving: '🐢' },
-    { id: 'dog', standing: '🐕', moving: '🐕' },
-    { id: 'cat', standing: '🐈', moving: '🐈' },
-    { id: 'tiger', standing: '🐅', moving: '🐅' },
-    { id: 'mouse', standing: 'icon/mouse_standing.jpg', moving: 'icon/mouse_animation.gif' }
-];
-let loadedImages = {};
-let isPlayerMoving = false;
+let selectedCharacter = null; // 내가 선택한 캐릭터
+const CHARACTER_LIST = ['🐎', '🐇', '🐢', '🐕', '🐈', '🐅'];
 
 
 // Joystick state
@@ -259,36 +249,16 @@ function drawMaze(flagYOffset = 0) {
         }
     }
 
-    const drawCharacter = (charId, x, y, isMainPlayer) => {
-        const characterData = CHARACTER_LIST.find(c => c.id === charId);
-        if (!characterData) {
-            ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-            ctx.fillText('?', x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
-            return;
-        }
-
-        let asset = (isMainPlayer && isPlayerMoving) ? characterData.moving : characterData.standing;
-
-        if (asset.endsWith('.jpg') || asset.endsWith('.gif') || asset.endsWith('.png')) {
-            const img = loadedImages[asset];
-            if (img && img.complete) {
-                const imgSize = TILE_SIZE * 4.0;
-                ctx.drawImage(img, (x * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, (y * TILE_SIZE + TILE_SIZE / 2) - imgSize / 2, imgSize, imgSize);
-            }
-        } else {
-            ctx.font = `${TILE_SIZE * 4.0}px Arial`;
-            ctx.fillText(asset, x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2);
-        }
-    };
-
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.5; // 상대방 캐릭터 투명도 설정
+    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
     for (const id in otherPlayers) {
-        const other = otherPlayers[id];
-        drawCharacter(other.character, other.x, other.y, false);
+        const otherPlayer = otherPlayers[id];
+        ctx.fillText(otherPlayer.character || '👽', otherPlayer.x * TILE_SIZE + TILE_SIZE / 2, otherPlayer.y * TILE_SIZE + TILE_SIZE / 2);
     }
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = 1.0; // 원래 투명도로 복구
 
-    drawCharacter(player.character, player.x, player.y, true);
+    ctx.font = `${TILE_SIZE * 4.0}px Arial`;
+    ctx.fillText(player.character, player.x * TILE_SIZE + TILE_SIZE / 2, player.y * TILE_SIZE + TILE_SIZE / 2);
 }
 
 function animate() {
@@ -657,14 +627,12 @@ function movePlayer(dx, dy) {
         
         checkWin();
         if (isSoundOn && audioContextResumed && gallopingSound) {
-            isPlayerMoving = true;
             clearTimeout(moveSoundTimeout);
             if (gallopingSound.paused) {
                 gallopingSound.play().catch(e => console.error("Error playing sound:", e));
             }
             moveSoundTimeout = setTimeout(() => {
                 gallopingSound.pause();
-                isPlayerMoving = false;
             }, 500);
         }
     }
@@ -680,6 +648,7 @@ function saveOrLoadPosition(key) {
         playSound(spotSaveSound);
     } else if (savedPos) {
         player = { ...savedPos, character: player.character };
+        savedPositions[key] = null;
         checkWin();
         playSound(spotSaveSound);
     } else {
@@ -802,30 +771,19 @@ function updateCharacterSelectionUI(lobbyState) {
     CHARACTER_LIST.forEach(char => {
         const button = document.createElement('button');
         button.className = 'character-button';
-        button.dataset.character = char.id;
-
-        if (char.standing.endsWith('.jpg') || char.standing.endsWith('.gif') || char.standing.endsWith('.png')) {
-            const img = document.createElement('img');
-            img.src = char.standing;
-            img.style.width = '100%';
-            img.style.height = '100%';
-            img.style.objectFit = 'contain';
-            img.style.pointerEvents = 'none'; // Prevent image from capturing click
-            button.appendChild(img);
-        } else {
-            button.textContent = char.standing;
-        }
+        button.textContent = char;
+        button.dataset.character = char;
 
         const indicator = document.createElement('span');
         indicator.className = 'ready-indicator';
         indicator.textContent = '✅';
         button.appendChild(indicator);
 
-        if (selectedCharacter === char.id) {
+        if (selectedCharacter === char) {
             button.classList.add('selected');
         }
 
-        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char.id);
+        const playerWithChar = Object.values(lobbyState.players).find(p => p.character === char);
 
         if (playerWithChar) {
             if (playerWithChar.isReady) {
@@ -1192,7 +1150,7 @@ function startGameplay() {
 
     clearInterval(timerInterval);
     
-    player = { ...startPos, character: player.character || 'horse' };
+    player = { ...startPos, character: player.character || '🐎' };
     playerPath = [{ ...player }];
 
     initializeCanvasSize();
@@ -1221,7 +1179,7 @@ function restartMazeOnly() {
     generateMaze();
     placeStartEnd();
 
-    player = { ...startPos, character: player.character || 'horse' };
+    player = { ...startPos, character: player.character || '🐎' };
     playerPath = [{ ...player }];
     for (let key in savedPositions) savedPositions[key] = null;
     
@@ -1312,7 +1270,7 @@ function setupEventListeners() {
         mainLayout.className = `main-layout mode-${controlMode}`;
         startScreenModal.style.display = 'none';
         mainLayout.style.display = 'flex';
-        player.character = 'mouse';
+        player.character = '🐎';
         initGame();
     });
 
@@ -1604,36 +1562,11 @@ function populateSizeDropdowns() {
     mazeHeightSelectLobby.value = defaultSize;
 }
 
-function preloadImages() {
-    const promises = [];
-    CHARACTER_LIST.forEach(char => {
-        if (char.standing.endsWith('.jpg') || char.standing.endsWith('.gif') || char.standing.endsWith('.png')) {
-            const standingImg = new Image();
-            promises.push(new Promise(resolve => {
-                standingImg.onload = resolve;
-                standingImg.onerror = resolve;
-            }));
-            standingImg.src = char.standing;
-            loadedImages[char.standing] = standingImg;
-
-            const movingImg = new Image();
-            promises.push(new Promise(resolve => {
-                movingImg.onload = resolve;
-                movingImg.onerror = resolve;
-            }));
-            movingImg.src = char.moving;
-            loadedImages[char.moving] = movingImg;
-        }
-    });
-    return Promise.all(promises);
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     if (!CanvasRenderingContext2D.prototype.roundRect) {
         CanvasRenderingContext2D.prototype.roundRect=function(t,e,o,i,n){return o<2*n&&(n=o/2),i<2*n&&(n=i/2),this.beginPath(),this.moveTo(t+n,e),this.arcTo(t+o,e,t+o,e+i,n),this.arcTo(t+o,e+i,t,e+i,n),this.arcTo(t,e+i,t,e,n),this.arcTo(t,e,t+o,e,n),this.closePath(),this}
     }
     
-    await preloadImages();
     setupEventListeners();
     initAudio();
     showStartScreen();
