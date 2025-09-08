@@ -1,5 +1,3 @@
-// server.js
-
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -208,7 +206,7 @@ const endGame = (roomId, timedOut) => {
     };
 
     io.to(roomId).emit('gameOver', finalData);
-    resetRoomForNewGame(roomId);
+    // resetRoomForNewGame(roomId); // <-- 수정: 이 줄을 삭제하거나 주석 처리합니다.
 };
 
 const handlePlayerLeave = (socket) => {
@@ -434,6 +432,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  // <-- 수정: 새로운 이벤트 핸들러 추가
+  socket.on('backToLobby', () => {
+    const roomId = playerRooms[socket.id];
+    const room = rooms[roomId];
+    if (room && room.players[socket.id]) {
+        // 게임이 진행된 상태에서 첫 번째로 돌아온 플레이어라면 방 전체를 리셋
+        if (room.gameStarted) {
+            resetRoomForNewGame(roomId);
+        } else {
+            // 이미 방이 리셋된 상태라면, 현재 플레이어의 준비상태만 풀어주고 업데이트
+            room.players[socket.id].isReady = false;
+            updateLobbyState(roomId);
+        }
+    }
+  });
+
   socket.on('playerMovement', (movementData) => {
     const roomId = playerRooms[socket.id];
     if (roomId) {
@@ -492,4 +506,4 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`서버가 ${PORT}번 포트에서 실행 중입니다.`);
-});
+})
