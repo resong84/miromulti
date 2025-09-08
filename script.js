@@ -1,3 +1,4 @@
+
 // ===================================================================
 // 1. 코드 구조 개선: 기능별 그룹화
 // ===================================================================
@@ -1188,10 +1189,6 @@ function handlePlayAgain() {
         singlePlayerContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
-        // <-- 수정: 서버에 로비로 돌아가겠다는 신호를 보냄
-        if (socket) {
-            socket.emit('backToLobby');
-        }
     } else {
         startGameplay();
     }
