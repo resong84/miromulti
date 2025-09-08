@@ -1,4 +1,3 @@
-
 // ===================================================================
 // 1. 코드 구조 개선: 기능별 그룹화
 // ===================================================================
@@ -718,12 +717,14 @@ function returnToStart() {
     player.x = startPos.x;
     player.y = startPos.y;
 
-    if (socket) {
+    if (socket && isMultiplayer) {
         socket.emit('playerMovement', { x: player.x, y: player.y });
     }
 
     playerPath.push({ ...player });
-    if (playerPath.length > MAX_PLAYER_PATH) playerPath.shift();
+    if (playerPath.length > MAX_PLAYER_PATH) {
+        playerPath.shift();
+    }
     
     playSound(spotLoadSound);
 }
@@ -1144,10 +1145,11 @@ function showGameOverModal(data) {
     
     if (isMultiplayer) {
         document.getElementById('gameOverLobbyBtn').onclick = handleGoToLobbyChoice;
+        document.getElementById('gameOverPlayAgainBtn').onclick = handlePlayAgain;
     } else {
         document.getElementById('gameOverHomeBtn').onclick = showStartScreen;
+        document.getElementById('gameOverPlayAgainBtn').onclick = handlePlayAgain;
     }
-    document.getElementById('gameOverPlayAgainBtn').onclick = handlePlayAgain;
     document.getElementById('gameOverScreenshotBtn').onclick = takeScreenshot;
 
     winModal.style.display = 'flex';
@@ -1165,31 +1167,42 @@ function resetClientGameState() {
 
 function handleGoToLobbyChoice() {
     resetClientGameState();
-    if (socket) socket.emit('leaveRoom');
+    if (socket) {
+        socket.emit('leaveRoom'); // 서버에 방을 나간다고 알림
+    }
     
     winModal.style.display = 'none';
     mainLayout.style.display = 'none';
     startScreenModal.style.display = 'flex';
 
-    lobbyContainer.classList.add('hidden');
+    // '함께하기'의 방 생성/참여 화면으로 전환
+    gameModeContainer.classList.add('hidden');
     singlePlayerContainer.classList.add('hidden');
+    lobbyContainer.classList.add('hidden');
     multiplayerChoiceContainer.classList.remove('hidden');
+    
     homeButton.style.display = 'flex';
 }
 
 function handlePlayAgain() {
     resetClientGameState();
-    
     winModal.style.display = 'none';
     
     if (isMultiplayer) {
+        // 같은 방의 로비(대기실) 화면으로 전환
         mainLayout.style.display = 'none';
         startScreenModal.style.display = 'flex';
+        
         multiplayerChoiceContainer.classList.add('hidden');
         singlePlayerContainer.classList.add('hidden');
-        lobbyContainer.classList.remove('hidden');
+        lobbyContainer.classList.remove('hidden'); // 로비 화면 표시
+
         homeButton.style.display = 'flex';
+
+        // 서버에서 'lobbyStateUpdate' 이벤트를 보내주면
+        // 로비 UI(캐릭터 선택, 준비 상태 등)가 자동으로 갱신됩니다.
     } else {
+        // 싱글플레이어 모드에서는 같은 설정으로 게임을 다시 시작
         startGameplay();
     }
 }
