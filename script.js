@@ -1188,6 +1188,10 @@ function handlePlayAgain() {
         singlePlayerContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
+        // <-- 수정: 서버에 로비로 돌아가겠다는 신호를 보냄
+        if (socket) {
+            socket.emit('backToLobby');
+        }
     } else {
         startGameplay();
     }
@@ -1550,6 +1554,12 @@ function setupEventListeners() {
             saveOrLoadPosition(key);
             return;
         }
+        
+        // ★ 수정된 부분: '3'번 키 입력 처리 추가
+        if (key === '3') {
+            returnToStart();
+            return;
+        }
 
         // Q, W, E 키 입력 처리
         if (key === 'q') qAbilityButton.click();
@@ -1673,3 +1683,4 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("서버 연결 시도 중 즉시 에러 발생:", e);
     }
 });
+

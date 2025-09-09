@@ -1,5 +1,3 @@
-// server.js
-
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -208,7 +206,8 @@ const endGame = (roomId, timedOut) => {
     };
 
     io.to(roomId).emit('gameOver', finalData);
-    resetRoomForNewGame(roomId);
+    // ★ 수정된 부분: 게임 종료 시 즉시 방을 초기화하지 않도록 아래 줄을 주석 처리
+    // resetRoomForNewGame(roomId);
 };
 
 const handlePlayerLeave = (socket) => {
@@ -430,6 +429,22 @@ io.on('connection', (socket) => {
                 clearTimeout(room.timeoutId);
             }
             endGame(roomId, false);
+        }
+    }
+  });
+
+  // ★ 수정된 부분: 'backToLobby' 이벤트 핸들러 추가
+  socket.on('backToLobby', () => {
+    const roomId = playerRooms[socket.id];
+    const room = rooms[roomId];
+    if (room && room.players[socket.id]) {
+        // 게임이 진행된 상태에서 첫 번째로 돌아온 플레이어라면 방 전체를 리셋
+        if (room.gameStarted) {
+            resetRoomForNewGame(roomId);
+        } else {
+            // 이미 방이 리셋된 상태라면, 현재 플레이어의 준비상태만 풀어주고 업데이트
+            room.players[socket.id].isReady = false;
+            updateLobbyState(roomId);
         }
     }
   });
