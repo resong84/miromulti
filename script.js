@@ -1154,8 +1154,6 @@ function showGameOverModal(data) {
 
 function resetClientGameState() {
     gameWon = false;
-    if (wButtonClearInterval) clearInterval(wButtonClearInterval);
-    wButtonClearInterval = null;
     for (let key in savedPositions) savedPositions[key] = null;
     otherPlayers = {};
     
@@ -1178,6 +1176,7 @@ function handleGoToLobbyChoice() {
 
 function handlePlayAgain() {
     resetClientGameState();
+    
     winModal.style.display = 'none';
     
     if (isMultiplayer) {
@@ -1187,14 +1186,7 @@ function handlePlayAgain() {
         singlePlayerContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
-
-        // ★★★ 수정된 부분 ★★★
-        // 서버에 로비로 돌아가 다음 게임을 준비하겠다는 신호를 보냅니다.
-        if (socket) {
-            socket.emit('backToLobby');
-        }
     } else {
-        // 싱글플레이어는 클라이언트에서 즉시 재시작합니다.
         startGameplay();
     }
 }
@@ -1215,9 +1207,7 @@ function startGameplay() {
     treasureChests = [];
 
     [winModal, helpModal, screenshotModal].forEach(modal => {
-        if(modal.id !== 'winModal' || !socket) { 
-            modal.style.display = 'none';
-        }
+        modal.style.display = 'none';
     });
     
     // 게임 시작 시 모든 특수키 버튼 비활성화

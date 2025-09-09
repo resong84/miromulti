@@ -691,7 +691,6 @@ canvas {
     border-radius: var(--radius-small);
     background-size: 20px 20px; /* Define a size for the patterns */
 }
-/* ★ 수정된 부분: 투명도 0.4 -> 0.3으로 변경 */
 .mosaic-pattern-1 {
     background-image: repeating-linear-gradient(45deg, 
         rgba(0,0,0,0.3) 0, 
