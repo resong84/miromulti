@@ -1178,7 +1178,6 @@ function handleGoToLobbyChoice() {
 
 function handlePlayAgain() {
     resetClientGameState();
-    
     winModal.style.display = 'none';
     
     if (isMultiplayer) {
@@ -1188,11 +1187,14 @@ function handlePlayAgain() {
         singlePlayerContainer.classList.add('hidden');
         lobbyContainer.classList.remove('hidden');
         homeButton.style.display = 'flex';
-        // <-- 수정: 서버에 로비로 돌아가겠다는 신호를 보냄
+
+        // ★★★ 수정된 부분 ★★★
+        // 서버에 로비로 돌아가 다음 게임을 준비하겠다는 신호를 보냅니다.
         if (socket) {
             socket.emit('backToLobby');
         }
     } else {
+        // 싱글플레이어는 클라이언트에서 즉시 재시작합니다.
         startGameplay();
     }
 }
@@ -1554,12 +1556,6 @@ function setupEventListeners() {
             saveOrLoadPosition(key);
             return;
         }
-        
-        // ★ 수정된 부분: '3'번 키 입력 처리 추가
-        if (key === '3') {
-            returnToStart();
-            return;
-        }
 
         // Q, W, E 키 입력 처리
         if (key === 'q') qAbilityButton.click();
@@ -1683,4 +1679,3 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("서버 연결 시도 중 즉시 에러 발생:", e);
     }
 });
-
